@@ -1,0 +1,45 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - name: Version from tag
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}".TrimStart('v')
+          "VERSION=$v" >> $env:GITHUB_ENV
+          Set-Content VERSION $v -NoNewline
+      - name: Build launcher exe
+        run: |
+          pip install pyinstaller
+          pyinstaller --onefile --console --name "AI Music Video" launcher.py
+      - name: Stage app files
+        shell: pwsh
+        run: |
+          git archive --format=zip -o src.zip HEAD
+          Expand-Archive src.zip dist/app
+          Remove-Item -Recurse -Force dist/app/.github, dist/app/installer -ErrorAction SilentlyContinue
+          Copy-Item VERSION dist/app/VERSION -Force
+          Copy-Item "dist/AI Music Video.exe" dist/app/
+          Compress-Archive -Path dist/app/* -DestinationPath dist/app-update.zip
+      - name: Build installer
+        shell: pwsh
+        run: |
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DMyVersion=$env:VERSION" "/DSrc=..\dist\app" installer\setup.iss
+      - name: Publish release
+        shell: pwsh
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          gh release create "${{ github.ref_name }}" "dist/AI-Music-Video-Setup-$env:VERSION.exe" dist/app-update.zip `
+            --title "v$env:VERSION" --generate-notes

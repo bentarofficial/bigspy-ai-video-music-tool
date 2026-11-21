@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editor – Music Video Studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/editor-assets/editor.css">
+</head>
+<body>
+<header class="top">
+  <a class="ib" href="/" title="Về trang chính">←</a>
+  <div class="logo">🎬</div>
+  <input id="ptitle" class="ptitle" spellcheck="false">
+  <span id="saved" class="saved">Đã lưu</span>
+  <div class="grow"></div>
+  <button class="ib" id="undo" title="Hoàn tác (Ctrl+Z)">↶</button>
+  <button class="ib" id="redo" title="Làm lại (Ctrl+Y)">↷</button>
+  <button class="ib" id="help" title="Phím tắt">⌨</button>
+  <button class="primary" id="export">⬆ Xuất video</button>
+</header>
+
+<main class="work">
+  <!-- thư viện -->
+  <section class="lib panel" id="paneL">
+    <button class="collapse" data-col="l" title="Thu gọn / mở rộng">«</button>
+    <nav class="tabs">
+      <button data-tab="media" class="on">🎞 Media</button>
+      <button data-tab="text">T Chữ</button>
+      <button data-tab="trans">⇄ Chuyển cảnh</button>
+    </nav>
+    <div class="tabbody" data-body="media">
+      <label class="drop" id="drop">
+        <input type="file" id="file" multiple accept="video/*,image/*,audio/*" hidden>
+        <b>＋ Nhập media</b><small>Kéo thả video, ảnh, nhạc vào đây</small>
+      </label>
+      <div class="mgrid" id="mgrid"></div>
+    </div>
+    <div class="tabbody" data-body="text" hidden>
+      <div class="tpresets" id="tpresets"></div>
+    </div>
+    <div class="tabbody" data-body="trans" hidden>
+      <p class="hint">Nhấp để áp dụng cho clip đang chọn, hoặc kéo thả vào chỗ nối giữa 2 clip (nút ◆ trên timeline).</p>
+      <div class="row"><label>Thời lượng</label><div class="ctl"><input type="range" id="trDur" min="0.1" max="2" step="0.1" value="0.5"><span id="trDurLb">0.5s</span></div></div>
+      <div class="trgrid" id="trgrid"></div>
+      <div class="btnrow"><button class="ghost" id="trAll">Áp dụng cho tất cả chỗ nối</button><button class="ghost" id="trRand">🎲 Ngẫu nhiên</button><button class="ghost danger" id="trNone">Bỏ hết</button></div>
+    </div>
+  </section>
+
+  <div class="vsplit" data-side="l" title="Kéo để đổi độ rộng · nhấp đúp để về mặc định"></div>
+  <!-- xem trước -->
+  <section class="viewer panel">
+    <div class="stage" id="stage"><div id="player" class="player"></div><div class="ovl" id="ovl"></div></div>
+    <div class="transport">
+      <span class="tc" id="tc">00:00.00</span>
+      <div class="grow"></div>
+      <button class="ib" id="toStart" title="Về đầu (Home)">⏮</button>
+      <button class="ib" id="back1" title="Lùi 1 khung (←)">◀</button>
+      <button class="play" id="play" title="Phát / dừng (Space)">▶</button>
+      <button class="ib" id="fwd1" title="Tới 1 khung (→)">▶</button>
+      <button class="ib" id="toEnd" title="Về cuối (End)">⏭</button>
+      <div class="grow"></div>
+      <span class="tc dim" id="total">00:00.00</span>
+      <button class="ib" id="safe" title="Vùng an toàn TikTok/Reels">▣</button>
+    </div>
+  </section>
+
+  <div class="vsplit" data-side="r" title="Kéo để đổi độ rộng · nhấp đúp để về mặc định"></div>
+  <!-- thuộc tính -->
+  <section class="props panel" id="paneR"><button class="collapse" data-col="r" title="Thu gọn / mở rộng">»</button><div id="props"></div></section>
+</main>
+
+<div class="hsplit" id="hsplit"></div>
+
+<!-- timeline -->
+<section class="tlwrap">
+  <div class="tltools">
+    <button class="ib" id="split" title="Tách tại đầu phát (S / Ctrl+B)">✂</button>
+    <button class="ib" id="del" title="Xoá (Delete)">🗑</button>
+    <button class="ib" id="dup" title="Nhân bản (Ctrl+D)">⧉</button>
+    <span class="sep"></span>
+    <button class="ib on" id="snap" title="Hút dính (N)">🧲</button>
+    <button class="ib" id="ripple" title="Xoá tự dồn: xoá clip thì các clip phía sau cùng track lùi lại lấp chỗ trống">⇤ Dồn</button>
+    <span class="sep"></span>
+    <button class="ib" id="detach" title="Tách âm thanh khỏi video">♪⇣ Tách âm</button>
+    <div class="grow"></div>
+    <button class="ib" id="addtrack" title="Thêm track">＋ Track</button>
+    <span class="sep"></span>
+    <button class="ib" id="zout" title="Thu nhỏ (-)">－</button>
+    <input type="range" id="zoom" min="0" max="100" value="40">
+    <button class="ib" id="zin" title="Phóng to (+)">＋</button>
+    <button class="ib" id="zfit" title="Vừa khung">⤢</button>
+  </div>
+  <div class="tl" id="tl">
+    <div class="heads" id="heads"></div>
+    <div class="scroller" id="scroller">
+      <div class="canvas" id="canvas">
+        <div class="ruler" id="ruler"></div>
+        <div class="lanes" id="lanes"></div>
+        <div class="snapline" id="snapline" hidden></div>
+        <div class="playhead" id="playhead"><i></i></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="modal" id="modal" hidden><div class="mbox" id="mbox"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="/editor-assets/player.js"></script>
+<script src="/editor-assets/editor.js"></script>
+</body>
+</html>

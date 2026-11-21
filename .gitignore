@@ -1,0 +1,17 @@
+.env
+.cache/
+output/
+uploads/
+logs/
+*.pid
+remotion/node_modules/
+remotion/public/clips/
+remotion/public/jobs/
+__pycache__/
+.server.pid
+.studio.pid
+.deps.hash
+.claude/settings.local.json
+dist/
+build/
+*.spec

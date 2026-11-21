@@ -1,0 +1,11 @@
+faster-whisper
+imageio-ffmpeg
+soundfile
+librosa
+numpy
+requests
+fastapi
+uvicorn
+python-multipart
+# tùy chọn: tách giọng hát (nặng, cần PyTorch)
+# demucs
