@@ -32,6 +32,11 @@ export const subtitleSchema = z.object({
 	strokeWidth: z.number().min(0).max(16),
 	position: z.enum(['bottom', 'center', 'top']),
 	uppercase: z.boolean(),
+	/** hiệu ứng xuất hiện / biến mất của mỗi câu (id trong anim.ts) */
+	animIn: z.string().optional(),
+	animOut: z.string().optional(),
+	inDur: z.number().min(0.05).max(3).optional(),
+	outDur: z.number().min(0.05).max(3).optional(),
 });
 
 export const titleSchema = z.object({
@@ -44,7 +49,9 @@ export const titleSchema = z.object({
 	fontSize: z.number().min(12).max(400),
 	color: zColor(),
 	accentColor: zColor(),
-	animation: z.enum(['fade', 'zoom', 'typewriter', 'bounce', 'slide-up', 'glow']),
+	/** hiệu ứng xuất hiện (id trong anim.ts) */
+	animation: z.string(),
+	animOut: z.string().optional(),
 	/** vị trí dọc, % chiều cao khung hình */
 	y: z.number().min(0).max(100),
 });
@@ -62,6 +69,20 @@ export const videoSchema = z.object({
 	lines: z.array(lineSchema),
 	subtitle: subtitleSchema,
 	title: titleSchema,
+	colorFilter: z
+		.object({
+			preset: z.string(),
+			intensity: z.number().min(0).max(1).optional(),
+			brightness: z.number().optional(),
+			contrast: z.number().optional(),
+			saturation: z.number().optional(),
+			temperature: z.number().optional(),
+			tint: z.number().optional(),
+			vignette: z.number().optional(),
+			hue: z.number().optional(),
+			fade: z.number().optional(),
+		})
+		.optional(),
 });
 
 export type VideoProps = z.infer<typeof videoSchema>;

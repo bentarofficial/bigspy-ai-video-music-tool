@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Editor – Music Video Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link id="gfonts" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;700;900&family=Montserrat:wght@400;700;900&family=Roboto:wght@400;700;900&family=Open+Sans:wght@400;700;800&family=Nunito:wght@400;700;900&family=Lexend:wght@400;700;900&family=Josefin+Sans:wght@400;700&family=Quicksand:wght@400;700&family=Comfortaa:wght@400;700&family=Oswald:wght@400;700&family=Anton:wght@400&family=Baloo+2:wght@400;800&family=Playfair+Display:wght@400;700;900&family=Merriweather:wght@400;700;900&family=Noto+Serif:wght@400;700&family=Lobster:wght@400&family=Pacifico:wght@400&family=Dancing+Script:wght@400;700&family=Great+Vibes:wght@400&family=Charm:wght@400;700&family=Pattaya:wght@400&family=Patrick+Hand:wght@400&family=Sigmar:wght@400&display=block" rel="stylesheet">
 <link rel="stylesheet" href="/editor-assets/editor.css">
 </head>
 <body>
@@ -25,9 +26,9 @@
   <section class="lib panel" id="paneL">
     <button class="collapse" data-col="l" title="Thu gọn / mở rộng">«</button>
     <nav class="tabs">
-      <button data-tab="media" class="on">🎞 Media</button>
-      <button data-tab="text">T Chữ</button>
-      <button data-tab="trans">⇄ Chuyển cảnh</button>
+      <button data-tab="media" class="on" title="Media"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><span>Media</span></button>
+      <button data-tab="text" title="Chữ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6h14M12 6v13M9 19h6"/></svg><span>Chữ</span></button>
+      <button data-tab="trans" title="Chuyển cảnh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="8" height="10" rx="1.5"/><rect x="14" y="7" width="8" height="10" rx="1.5"/><path d="m10.5 12h3"/></svg><span>Chuyển cảnh</span></button>
     </nav>
     <div class="tabbody" data-body="media">
       <label class="drop" id="drop">
@@ -67,7 +68,11 @@
 
   <div class="vsplit" data-side="r" title="Kéo để đổi độ rộng · nhấp đúp để về mặc định"></div>
   <!-- thuộc tính -->
-  <section class="props panel" id="paneR"><button class="collapse" data-col="r" title="Thu gọn / mở rộng">»</button><div id="props"></div></section>
+  <section class="props panel" id="paneR"><button class="collapse" data-col="r" title="Thu gọn / mở rộng">»</button>
+    <nav class="rtabs"><button data-rtab="props" class="on" title="Thuộc tính"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg><span>Thuộc tính</span></button><button data-rtab="style" title="Phụ đề"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 14h4M13 14h4M7 10h10"/></svg><span>Phụ đề</span></button><button data-rtab="audio" title="Âm lượng"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg><span>Âm lượng</span></button><button data-rtab="canvas" title="Khung hình"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v14h14M3 7h14v14"/></svg><span>Khung hình</span></button><button data-rtab="filter" title="Bộ lọc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="10" r="5"/><circle cx="15" cy="10" r="5"/><circle cx="12" cy="15" r="5"/></svg><span>Bộ lọc</span></button></nav>
+    <div id="props"></div>
+    <div class="rbody" data-rbody="style" hidden></div><div class="rbody" data-rbody="audio" hidden></div><div class="rbody" data-rbody="canvas" hidden></div><div class="rbody" data-rbody="filter" hidden></div>
+  </section>
 </main>
 
 <div class="hsplit" id="hsplit"></div>
@@ -75,16 +80,23 @@
 <!-- timeline -->
 <section class="tlwrap">
   <div class="tltools">
-    <button class="ib" id="split" title="Tách tại đầu phát (S / Ctrl+B)">✂</button>
-    <button class="ib" id="del" title="Xoá (Delete)">🗑</button>
-    <button class="ib" id="dup" title="Nhân bản (Ctrl+D)">⧉</button>
+    <button class="ib" id="split" title="Tách khối tại đầu phát (S / Ctrl+B) – với câu lời: chia chữ theo giờ hát"><i class="tic" style="color:#f87171">✂</i> Tách</button>
+    <button class="ib" id="del" title="Xoá (Delete)"><i class="tic" style="color:#fb7185">🗑</i> Xoá</button>
+    <button class="ib" id="dup" title="Nhân bản (Ctrl+D)"><i class="tic" style="color:#60a5fa">⧉</i></button>
+    <button class="ib" id="tbGroup" title="Nhóm các khối đang chọn (Ctrl+G) – Ctrl/Shift + nhấp để chọn nhiều"><i class="tic" style="color:#34d399">🔗</i> Nhóm</button>
+    <button class="ib" id="tbUngroup" title="Bỏ nhóm (Ctrl+Shift+G)"><i class="tic" style="color:#fbbf24">⛓</i> Bỏ nhóm</button>
     <span class="sep"></span>
-    <button class="ib on" id="snap" title="Hút dính (N)">🧲</button>
-    <button class="ib" id="ripple" title="Xoá tự dồn: xoá clip thì các clip phía sau cùng track lùi lại lấp chỗ trống">⇤ Dồn</button>
+    <button class="ib" id="tbAlignScenes" title="Dời các điểm chuyển cảnh của Video chính ra khoảng nghỉ giữa hai câu hát – không còn chuyển cảnh khi đang hát dở câu"><i class="tic" style="color:#f472b6">⇹</i> Căn cảnh theo câu</button>
+    <button class="ib" id="tbAddLyric" title="Thêm câu lời tại đầu phát"><i class="tic" style="color:#c084fc">＋</i> Câu lời</button>
+    <button class="ib" id="tbAddCover" title="Khung làm mờ để che phụ đề / logo có sẵn trong clip"><i class="tic" style="color:#38bdf8">＋</i> Lớp che mờ</button>
+    <button class="ib" id="tbAddText" title="Chữ / tiêu đề tự nhập"><i class="tic" style="color:#facc15">＋</i> Chữ</button>
     <span class="sep"></span>
-    <button class="ib" id="detach" title="Tách âm thanh khỏi video">♪⇣ Tách âm</button>
+    <button class="ib on" id="snap" title="Hút dính (N)"><i class="tic" style="color:#f43f5e">🧲</i></button>
+    <button class="ib" id="ripple" title="Xoá tự dồn: xoá clip thì các clip phía sau cùng track lùi lại lấp chỗ trống"><i class="tic" style="color:#2dd4bf">⇤</i> Dồn</button>
+    <span class="sep"></span>
+    <button class="ib" id="detach" title="Tách âm thanh khỏi video"><i class="tic" style="color:#a78bfa">♪⇣</i> Tách âm</button>
     <div class="grow"></div>
-    <button class="ib" id="addtrack" title="Thêm track">＋ Track</button>
+    <button class="ib" id="addtrack" title="Thêm track"><i class="tic" style="color:#4ade80">＋</i> Track</button>
     <span class="sep"></span>
     <button class="ib" id="zout" title="Thu nhỏ (-)">－</button>
     <input type="range" id="zoom" min="0" max="100" value="40">

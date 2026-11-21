@@ -54,14 +54,22 @@ def main() -> None:
     p.add_argument("--no-lyrics",action="store_true", help="bài không lời: bỏ qua phụ đề")
     p.add_argument("--orientation", choices=list(SIZES), default="portrait")
     p.add_argument("--fps", type=int, default=30)
-    p.add_argument("--scene-length", type=float, default=4.0, help="độ dài mong muốn mỗi cảnh (giây)")
+    p.add_argument("--scene-length", type=float, default=4.0, help="độ dài mong muốn mỗi cảnh (giây); 0 = auto, chỉ chuyển cảnh khi hát xong một câu")
     p.add_argument("--claude-model", default="", help="model Claude CLI, ví dụ claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5, claude-fable-5-2")
     p.add_argument("--claude-effort", default="", choices=["", *keywords.EFFORTS], help="mức suy nghĩ của Claude")
     p.add_argument("--theme", help="chủ đề hình ảnh, ví dụ 'ocean, sunset, city night'")
     p.add_argument("--subtitle-mode", choices=["karaoke", "preview", "full"], default="karaoke")
-    p.add_argument("--title-animation", choices=["fade", "zoom", "typewriter", "bounce", "slide-up", "glow"],
-                   default="zoom")
+    p.add_argument("--title-animation", default="zoom", help="hiệu ứng xuất hiện tên bài (id trong remotion/src/anim.ts)")
+    p.add_argument("--title-out", default="fade", help="hiệu ứng biến mất tên bài")
+    p.add_argument("--sub-in", default="", help="hiệu ứng xuất hiện mỗi câu phụ đề (trống = mặc định)")
+    p.add_argument("--sub-out", default="fade", help="hiệu ứng biến mất mỗi câu phụ đề")
     p.add_argument("--title-color", default="#ffffff")
+    p.add_argument("--title-font", default="Arial Black, Arial, sans-serif", help="phông tên bài")
+    p.add_argument("--sub-font", default="Arial Black, Arial, sans-serif", help="phông phụ đề")
+    p.add_argument("--sub-color", default="#ffffff", help="màu chữ phụ đề")
+    p.add_argument("--sub-highlight", default="#ffd23f", help="màu tô karaoke")
+    p.add_argument("--color-filter", default="none", help="bộ lọc màu phủ toàn video (id trong remotion/src/colorFilter.tsx, ví dụ natural, cinematic, kodak, bw)")
+    p.add_argument("--filter-intensity", type=float, default=1.0, help="cường độ bộ lọc 0..1")
     p.add_argument("--render", action="store_true", help="render ra MP4 ngay sau khi chuẩn bị xong")
     p.add_argument("--render-only", metavar="PROPS", help="chỉ render lại từ một props.json đã có")
     p.add_argument("--job", help="tên thư mục job (mặc định lấy từ tên bài)")
@@ -179,17 +187,20 @@ def main() -> None:
         "lines": lines,
         "subtitle": {
             "mode": a.subtitle_mode, "lookahead": 2, "leadIn": 0.6,
-            "fontFamily": "Arial Black, Arial, sans-serif", "fontSize": round(base * 0.065),
-            "color": "#ffffff", "highlightColor": "#ffd23f", "strokeColor": "#000000", "strokeWidth": 6,
+            "fontFamily": a.sub_font, "fontSize": round(base * 0.065),
+            "color": a.sub_color, "highlightColor": a.sub_highlight, "strokeColor": "#000000", "strokeWidth": 6,
             "position": "bottom", "uppercase": False,
+            **({"animIn": a.sub_in} if a.sub_in else {}), "animOut": a.sub_out,
         },
         "title": {
             "enabled": bool(a.title), "text": a.title, "subtext": a.subtitle_text,
             "start": 0.3, "duration": 4.0,
-            "fontFamily": "Arial Black, Arial, sans-serif", "fontSize": round(base * 0.11),
-            "color": a.title_color, "accentColor": "#ff4fa3", "animation": a.title_animation, "y": 42,
+            "fontFamily": a.title_font, "fontSize": round(base * 0.11),
+            "color": a.title_color, "accentColor": "#ff4fa3", "animation": a.title_animation, "animOut": a.title_out, "y": 42,
         },
     }
+    if a.color_filter and a.color_filter != "none":
+        props["colorFilter"] = {"preset": a.color_filter, "intensity": max(0.0, min(1.0, a.filter_intensity))}
     props_path = out_dir / "props.json"
     props_path.write_text(json.dumps(props, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"✔ Đã tạo {props_path}")

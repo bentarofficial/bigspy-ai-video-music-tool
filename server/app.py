@@ -91,6 +91,26 @@ def index():
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
+# ---------- lựa chọn đã lưu trên form Tạo video (giữ qua mọi lần tắt/mở app) ----------
+PREFS = ROOT / "prefs.json"
+
+
+@app.get("/api/prefs")
+def get_prefs():
+    try:
+        return json.loads(PREFS.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+@app.post("/api/prefs")
+def set_prefs(body: dict):
+    clean = {str(k)[:40]: v for k, v in body.items() if isinstance(v, (str, bool, int, float))}
+    clean = {k: (v[:200] if isinstance(v, str) else v) for k, v in list(clean.items())[:60]}
+    PREFS.write_text(json.dumps(clean, ensure_ascii=False, indent=1), encoding="utf-8")
+    return {"ok": True}
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -159,9 +179,12 @@ async def create_job(
     audio: UploadFile = File(...),
     title: str = Form(""), subtext: str = Form(""), lyrics: str = Form(""),
     lang: str = Form(""), orientation: str = Form("portrait"), subtitle_mode: str = Form("karaoke"),
-    title_animation: str = Form("zoom"), title_color: str = Form("#ffffff"), theme: str = Form(""),
+    title_animation: str = Form("zoom"), title_color: str = Form("#ffffff"), title_font: str = Form(""), sub_font: str = Form(""),
+    sub_color: str = Form("#ffffff"), sub_highlight: str = Form("#ffd23f"),
+    title_out: str = Form("fade"), sub_in: str = Form(""), sub_out: str = Form("fade"), theme: str = Form(""),
     whisper_model: str = Form("small"), separate: bool = Form(False), no_lyrics: bool = Form(False),
     scene_length: float = Form(4.0),
+    color_filter: str = Form("none"), filter_intensity: float = Form(1.0),
     claude_model: str = Form(""), claude_effort: str = Form(""),
     start: str = Form(""), end: str = Form(""),
 ):
@@ -183,10 +206,19 @@ async def create_job(
     args = [str(src), "--job", job_id, "--orientation", orientation, "--subtitle-mode", subtitle_mode,
             "--title-animation", title_animation, "--title-color", title_color,
             "--whisper-model", whisper_model, "--scene-length", str(scene_length), "--render"]
+    font_ok = lambda f: re.fullmatch(r"[A-Za-z0-9 ,\-]{1,80}", f)
+    if font_ok(title_font): args += ["--title-font", title_font]
+    if font_ok(sub_font): args += ["--sub-font", sub_font]
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", sub_color): args += ["--sub-color", sub_color]
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", sub_highlight): args += ["--sub-highlight", sub_highlight]
+    for flag, v in (("--title-out", title_out), ("--sub-in", sub_in), ("--sub-out", sub_out)):
+        if re.fullmatch(r"[a-z\-]{1,20}", v): args += [flag, v]
     if title: args += ["--title", title]
     if subtext: args += ["--subtitle-text", subtext]
     if lang: args += ["--lang", lang]
     if theme: args += ["--theme", theme]
+    if re.fullmatch(r"[a-z0-9]{1,20}", color_filter) and color_filter != "none":
+        args += ["--color-filter", color_filter, "--filter-intensity", f"{max(0.0, min(1.0, filter_intensity)):.2f}"]
     if re.fullmatch(r"[a-z0-9.\-]{1,60}", claude_model): args += ["--claude-model", claude_model]
     if claude_effort in {"low", "medium", "high", "xhigh", "max"}: args += ["--claude-effort", claude_effort]
     try:
@@ -354,6 +386,10 @@ MEDIA_EXT = {".mp4": "video", ".mov": "video", ".webm": "video", ".mkv": "video"
 @app.get("/editor", response_class=HTMLResponse)
 def editor_page():
     html = (STATIC / "editor" / "editor.html").read_text(encoding="utf-8")
+    # gắn ?v=<thời điểm sửa file> để trình duyệt luôn tải bản mới sau khi cập nhật
+    for name in ("editor.css", "player.js", "editor.js"):
+        v = int((STATIC / "editor" / name).stat().st_mtime)
+        html = html.replace(f"/editor-assets/{name}\"", f"/editor-assets/{name}?v={v}\"")
     return HTMLResponse(html, headers={"Cache-Control": "no-store"})
 
 
@@ -363,9 +399,9 @@ def _uid() -> str:
 
 def blank_timeline(w: int, h: int) -> dict:
     return {"version": 1, "fps": 30, "width": w, "height": h, "background": "#000000",
-            "tracks": [{"id": "t1", "kind": "text", "name": "Chữ 1"},
-                       {"id": "v1", "kind": "video", "name": "Video 1"},
-                       {"id": "a1", "kind": "audio", "name": "Âm thanh 1"}],
+            "tracks": [{"id": "t1", "kind": "mixed", "name": "Track 1"},
+                       {"id": "v1", "kind": "main", "name": "Video chính"},
+                       {"id": "a1", "kind": "mixed", "name": "Track 2"}],
             "clips": [], "media": []}
 
 
@@ -381,10 +417,10 @@ def timeline_from_props(p: dict) -> dict:
     """Chuyển kết quả AI (props.json) thành timeline để chỉnh tiếp như trình dựng video."""
     tl = blank_timeline(p["width"], p["height"])
     tl["fps"] = p.get("fps", 30)
-    tl["tracks"] = [{"id": "t1", "kind": "text", "name": "Tiêu đề"},
-                    {"id": "t2", "kind": "text", "name": "Lời bài hát"},
-                    {"id": "v1", "kind": "video", "name": "Video 1"},
-                    {"id": "a1", "kind": "audio", "name": "Nhạc"}]
+    tl["tracks"] = [{"id": "t1", "kind": "mixed", "name": "Tiêu đề"},
+                    {"id": "t2", "kind": "mixed", "name": "Lời bài hát"},
+                    {"id": "v1", "kind": "main", "name": "Video chính"},
+                    {"id": "a1", "kind": "mixed", "name": "Nhạc"}]
     clips, media, seen = [], [], set()
     for s in p.get("scenes", []):
         dur = round(s["end"] - s["start"], 3)
@@ -412,13 +448,19 @@ def timeline_from_props(p: dict) -> dict:
                       "in": 0, "srcDur": dur, "name": "Bài hát", "volume": 1})
         media.append({"id": _uid(), "name": "Bài hát", "src": p["audio"], "type": "audio", "duration": dur})
     if p.get("lines"):
-        clips.append({"id": _uid(), "track": "t2", "type": "lyrics", "start": 0, "dur": dur, "in": 0,
-                      "name": "Lời bài hát", "lines": p["lines"], "subtitle": p["subtitle"]})
+        for ln in p["lines"]:  # mỗi câu 1 clip riêng để sửa / kéo từng câu
+            d = round(ln["end"] - ln["start"], 3)
+            if d > 0 and ln.get("words"):
+                clips.append({"id": _uid(), "track": "t2", "type": "lyrics", "start": ln["start"], "dur": d,
+                              "in": ln["start"], "name": " ".join(w["text"] for w in ln["words"]),
+                              "lines": [ln], "subtitle": p["subtitle"]})
     t = p.get("title") or {}
     if t.get("enabled") and t.get("text"):
         clips.append({"id": _uid(), "track": "t1", "type": "text", "start": t.get("start", 0),
                       "dur": t.get("duration", 3), "name": t["text"], "title": {**t, "start": 0}})
     tl["clips"], tl["media"] = clips, media
+    if p.get("colorFilter"):
+        tl["filter"] = p["colorFilter"]
     return tl
 
 

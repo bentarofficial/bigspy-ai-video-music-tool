@@ -1,5 +1,16 @@
 # AI Music Video Tool
 
+<p align="center">
+  <a href="https://github.com/bentarofficial/bigspy-ai-video-music-tool/releases/latest">
+    <img src="https://img.shields.io/badge/⬇%20Tải%20về%20cho%20Windows-bản%20mới%20nhất-2ea44f?style=for-the-badge" alt="Tải về">
+  </a>
+  <br>
+  <img src="https://img.shields.io/github/v/release/bentarofficial/bigspy-ai-video-music-tool?label=phiên%20bản" alt="Phiên bản">
+  <img src="https://img.shields.io/github/downloads/bentarofficial/bigspy-ai-video-music-tool/total?label=lượt%20tải" alt="Lượt tải">
+</p>
+
+> Tải file `AI-Music-Video-Setup-x.y.z.exe` trong mục **Assets** của bản phát hành mới nhất, chạy và làm theo hướng dẫn cài đặt.
+
 Tải lên một file nhạc (mp3/wav/m4a/flac). Tool sẽ:
 
 1. Nghe và lấy **lời bài hát** kèm thời điểm từng chữ (Whisper). Nếu bạn dán sẵn lời, tool căn lời đó vào giọng hát nên chính xác hơn.

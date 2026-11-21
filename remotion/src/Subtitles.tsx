@@ -1,6 +1,7 @@
 import React from 'react';
 import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {Line, SubtitleStyle} from './schema';
+import {applyIn, applyOut, fxTransform, noFx, type Fx} from './anim';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 const HOLD = 0.4; // giữ câu thêm chút sau chữ cuối
@@ -8,12 +9,13 @@ const HOLD = 0.4; // giữ câu thêm chút sau chữ cuối
 type W = Line['words'][number];
 
 /** Một chữ: lớp màu thường + lớp màu highlight được "quét" từ trái sang phải theo tiến độ hát. */
-const Word: React.FC<{w: W; t: number; s: SubtitleStyle; visible: boolean; appearAt: number}> = ({
+const Word: React.FC<{w: W; t: number; s: SubtitleStyle; visible: boolean; appearAt: number; wfx?: Fx}> = ({
 	w,
 	t,
 	s,
 	visible,
 	appearAt,
+	wfx,
 }) => {
 	const progress = interpolate(t, [w.start, Math.max(w.end, w.start + 0.05)], [0, 1], clamp);
 	const active = t >= w.start && t < w.end;
@@ -30,8 +32,9 @@ const Word: React.FC<{w: W; t: number; s: SubtitleStyle; visible: boolean; appea
 				position: 'relative',
 				display: 'inline-block',
 				margin: `0 ${s.fontSize * 0.14}px`,
-				transform: `scale(${scale})`,
-				opacity: visible ? (s.mode === 'preview' ? pop : 1) : 0,
+				transform: `${wfx ? fxTransform(wfx) + ' ' : ''}scale(${scale})`,
+				filter: wfx?.blur ? `blur(${wfx.blur}px)` : undefined,
+				opacity: (visible ? (s.mode === 'preview' ? pop : 1) : 0) * (wfx ? wfx.opacity : 1),
 				transition: 'none',
 			}}
 		>
@@ -63,9 +66,22 @@ const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: numbe
 	const shownAt = line.start - s.leadIn;
 	// giữ câu trên màn hình tới khi câu kế tiếp xuất hiện (phụ đề xuyên suốt)
 	const hideAt = Math.max(until, line.end + HOLD);
-	const opacity =
-		interpolate(t, [shownAt, shownAt + 0.2], [0, 1], clamp) *
-		(Number.isFinite(hideAt) ? interpolate(t, [hideAt - 0.15, hideAt], [1, 0], clamp) : 1);
+	const {fps, width} = useVideoConfig();
+	const D = width * 0.12;
+	const animIn = s.animIn, animOut = s.animOut ?? 'fade';
+	const inF = Math.round((s.inDur ?? 0.3) * fps), outF = Math.round((s.outDur ?? (s.animOut ? 0.3 : 0.15)) * fps);
+	const fIn = (t - shownAt) * fps, rOut = Number.isFinite(hideAt) ? (hideAt - t) * fps : 1e9;
+	const perWord = !!animIn?.startsWith('word-');
+	// cả câu: hiệu ứng vào/ra (chưa chọn hiệu ứng = kiểu cũ: mờ dần + trồi nhẹ)
+	const fx = noFx();
+	if (!animIn) {
+		fx.opacity = interpolate(t, [shownAt, shownAt + 0.2], [0, 1], clamp);
+		fx.ty = interpolate(fx.opacity, [0, 1], [20, 0]);
+	} else if (!perWord) applyIn(fx, animIn, fIn, inF, fps, D);
+	applyOut(fx, animOut, rOut, outF, D);
+	const opacity = fx.opacity;
+	const stagger = Math.max(1, Math.round(fps * 0.07));
+	const wordFx = (i: number) => (perWord ? applyIn(noFx(), {'word-pop': 'pop', 'word-rise': 'rise', 'word-fade': 'fade'}[animIn!] ?? 'fade', fIn - i * stagger, inF, fps, D) : undefined);
 	// chỉ số chữ đang/đã hát gần nhất
 	let current = -1;
 	line.words.forEach((w, i) => {
@@ -83,7 +99,8 @@ const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: numbe
 				fontSize: s.fontSize * scale,
 				fontWeight: 900,
 				opacity: opacity * (dim ? 0.55 : 1),
-				transform: `translateY(${interpolate(opacity, [0, 1], [20, 0])}px)`,
+				transform: fxTransform({...fx, opacity: 1}),
+				filter: fx.blur ? `blur(${fx.blur}px)` : undefined,
 				textAlign: 'center',
 			}}
 		>
@@ -92,7 +109,7 @@ const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: numbe
 				const visible = s.mode !== 'preview' || i <= current + s.lookahead;
 				const trigger = i - s.lookahead - 1;
 				const appearAt = trigger < 0 ? shownAt : line.words[trigger].start;
-				return <Word key={i} w={w} t={dim ? -1 : t} s={s} visible={visible} appearAt={appearAt} />;
+				return <Word key={i} w={w} t={dim ? -1 : t} s={s} visible={visible} appearAt={appearAt} wfx={wordFx(i)} />;
 			})}
 		</div>
 	);

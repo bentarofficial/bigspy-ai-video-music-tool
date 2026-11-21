@@ -3,6 +3,7 @@ import React, {useImperativeHandle, useRef, useState, forwardRef} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Player, type PlayerRef} from '@remotion/player';
 import {Timeline} from './Timeline';
+import {FILTER_CATEGORIES, FILTER_PRESETS, gradeStyle} from '../colorFilter';
 import {timelineDuration, type TimelineProps} from './types';
 
 type Api = {
@@ -32,6 +33,9 @@ const Host = forwardRef<Api, {initial: TimelineProps}>(({initial}, ref) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (window as any).TLPlayer = {
+	FILTER_PRESETS,
+	FILTER_CATEGORIES,
+	gradeStyle,
 	mount(el: HTMLElement, initial: TimelineProps): Promise<Api> {
 		return new Promise((resolve) => {
 			const root = createRoot(el);

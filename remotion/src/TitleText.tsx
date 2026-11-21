@@ -1,53 +1,29 @@
 import React from 'react';
-import {AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {applyIn, applyOut, fxTransform, noFx} from './anim';
 import type {TitleProps} from './schema';
 
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 
 export const TitleText: React.FC<TitleProps> = (p) => {
 	const frame = useCurrentFrame();
-	const {fps} = useVideoConfig();
+	const {fps, width} = useVideoConfig();
 	const f = frame - Math.round(p.start * fps);
 	const total = Math.round(p.duration * fps);
 	if (f < 0 || f > total) return null;
 
-	const enter = spring({frame: f, fps, config: {damping: 14}});
-	const exit = interpolate(f, [total - fps * 0.5, total], [1, 0], clamp);
-
-	let opacity = exit;
-	let transform = '';
+	const D = width * 0.25;
+	const fx = noFx();
 	let text = p.text;
-	let textShadow = `0 6px 24px rgba(0,0,0,.55)`;
-
-	switch (p.animation) {
-		case 'fade':
-			opacity *= interpolate(f, [0, fps * 0.7], [0, 1], clamp);
-			break;
-		case 'zoom':
-			opacity *= interpolate(f, [0, fps * 0.25], [0, 1], clamp);
-			transform = `scale(${interpolate(enter, [0, 1], [0.3, 1])})`;
-			break;
-		case 'bounce': {
-			const b = spring({frame: f, fps, config: {damping: 6, stiffness: 120}});
-			transform = `translateY(${(1 - b) * -400}px)`;
-			break;
-		}
-		case 'slide-up':
-			opacity *= enter;
-			transform = `translateY(${(1 - enter) * 220}px)`;
-			break;
-		case 'typewriter': {
-			const chars = Array.from(p.text);
-			text = chars.slice(0, Math.floor(f / (fps * 0.07)) + 1).join('');
-			break;
-		}
-		case 'glow': {
-			opacity *= interpolate(f, [0, fps * 0.5], [0, 1], clamp);
-			const g = 20 + 14 * Math.sin(f / 5);
-			textShadow = `0 0 ${g}px ${p.accentColor}, 0 0 ${g * 2}px ${p.accentColor}`;
-			break;
-		}
-	}
+	if (p.animation === 'typewriter') {
+		text = Array.from(p.text).slice(0, Math.floor(f / (fps * 0.07)) + 1).join('');
+	} else applyIn(fx, p.animation, f, Math.round(fps * 0.6), fps, D);
+	applyOut(fx, p.animOut ?? 'fade', total - f, Math.round(fps * 0.5), D);
+	const exit = applyOut(noFx(), p.animOut ?? 'fade', total - f, Math.round(fps * 0.5), D).opacity;
+	const {opacity} = fx;
+	const transform = fxTransform(fx);
+	const g = 20 + 14 * Math.sin(f / 5);
+	const textShadow = fx.glow ? `0 0 ${g}px ${p.accentColor}, 0 0 ${g * 2}px ${p.accentColor}` : `0 6px 24px rgba(0,0,0,.55)`;
 
 	const sub = interpolate(f, [fps * 0.5, fps * 1.1], [0, 1], clamp);
 	return (
@@ -70,6 +46,7 @@ export const TitleText: React.FC<TitleProps> = (p) => {
 						color: p.color,
 						opacity,
 						transform,
+						filter: fx.blur ? `blur(${fx.blur}px)` : undefined,
 						textShadow,
 					}}
 				>
