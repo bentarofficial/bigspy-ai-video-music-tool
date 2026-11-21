@@ -587,7 +587,7 @@ async function loadKeys() {
   $('#clPill').className = 'pill' + (clOn ? ' on' : !keys.claudeCli ? ' warn' : '');
   $('#k2').textContent = !keys.claudeCli ? 'Chưa cài lệnh claude' : clOn ? 'Chọn cảnh theo lời bài hát' : keys.codexCli && keys.codexEnabled ? 'Đã ngắt — Codex chọn cảnh thay' : 'Dùng ô Chủ đề hình ảnh';
   $('#clToggle').hidden = !keys.claudeCli;
-  $('#clToggle').textContent = clOn ? 'Huỷ kết nối' : 'Kết nối lại';
+  $('#clToggle').textContent = clOn ? 'Huỷ kết nối' : 'Kết nối';
   $('#clToggle').className = clOn ? 'ghost danger' : '';
   const cxOn = keys.codexCli && keys.codexEnabled;
   $('#cxPill').textContent = !keys.codexCli ? 'Không thấy' : cxOn ? 'Đã kết nối' : 'Đã ngắt';
@@ -595,7 +595,7 @@ async function loadKeys() {
   $('#k3').textContent = !keys.codexCli ? 'Chưa cài lệnh codex' : !cxOn ? 'Không dùng làm dự phòng'
     : clOn ? 'Dự phòng khi Claude lỗi' : 'Đang thay Claude chọn cảnh';
   $('#cxToggle').hidden = !keys.codexCli;
-  $('#cxToggle').textContent = cxOn ? 'Huỷ kết nối' : 'Kết nối lại';
+  $('#cxToggle').textContent = cxOn ? 'Huỷ kết nối' : 'Kết nối';
   $('#cxToggle').className = cxOn ? 'ghost danger' : '';
 }
 $('#saveKeys').onclick = async () => {
