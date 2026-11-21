@@ -92,7 +92,7 @@ function alignScenesToLyrics() {
 }
 
 /* ---------- lịch sử & lưu ---------- */
-const snap = () => JSON.stringify({tracks: TL.tracks, clips: TL.clips, media: TL.media, width: TL.width, height: TL.height, background: TL.background});
+const snap = () => JSON.stringify({tracks: TL.tracks, clips: TL.clips, media: TL.media, width: TL.width, height: TL.height, background: TL.background, filter: TL.filter ?? null});
 function commit() {
   if (TL) { explodeLyrics(); syncLyrics(); }
   hist.push(lastSnap); if (hist.length > 200) hist.shift();
@@ -902,20 +902,40 @@ function renderAI(box) {
   $('#aiSend').onclick = sendAI;
   $('#aiIn').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendAI(); };
 }
+/* Bản lưu trước mỗi lần AI sửa (giữ 10 bản, còn cả sau khi tải lại trang) -> "khôi phục lại" không cần gọi AI. */
+const AI_SNAP_KEY = `ed.aisnaps.${JOB}`;
+let aiSnaps = []; try { aiSnaps = JSON.parse(localStorage.getItem(AI_SNAP_KEY) || '[]'); } catch {}
+const saveAISnaps = () => { try { localStorage.setItem(AI_SNAP_KEY, JSON.stringify(aiSnaps)); } catch { aiSnaps = aiSnaps.slice(-3); } };
+const RESTORE_RE = /^\s*(khôi phục|khoi phuc|hoàn tác|hoan tac|quay lại|quay lai|trở lại|tro lai|undo|bỏ thay đổi|bo thay doi|về như cũ|ve nhu cu|như cũ|nhu cu|không ưng|khong ung|huỷ|hủy)/i;
+const ALL_RE = /ban đầu|ban dau|tất cả|tat ca|toàn bộ|toan bo|lúc đầu|luc dau/i;
+function restoreAI(all) {
+  if (!aiSnaps.length) return 'Không còn bản nào để khôi phục.';
+  const k = all ? aiSnaps.length : 1, s = aiSnaps[aiSnaps.length - k];
+  aiSnaps.length -= k; saveAISnaps();
+  hist.push(lastSnap); fut.length = 0; restore(s); // vẫn Ctrl+Y / Ctrl+Z được
+  return all ? `Đã khôi phục về trước ${k} lần sửa bằng AI.` : 'Đã khôi phục về trước lần sửa bằng AI gần nhất.';
+}
 function drawAILog() {
   const el = $('#aiLog'); if (!el) return;
   el.innerHTML = aiLog.map((m) => `<div class="aimsg ${m.who}">${esc(m.text)}</div>`).join('') || '<p class="hint">Chọn một ví dụ bên dưới hoặc tự nhập câu lệnh.</p>';
+  if (aiSnaps.length) el.insertAdjacentHTML('beforeend', `<div class="btnrow"><button class="ghost" id="aiUndo">↺ Khôi phục lần trước</button>${aiSnaps.length > 1 ? `<button class="ghost" id="aiUndoAll">↺ Về như ban đầu (${aiSnaps.length})</button>` : ''}</div>`);
+  const one = (all) => { aiLog.length = 0; aiLog.push({who: 'ai', text: '✓ ' + restoreAI(all)}); drawAILog(); };
+  if ($('#aiUndo')) $('#aiUndo').onclick = () => one(false);
+  if ($('#aiUndoAll')) $('#aiUndoAll').onclick = () => one(true);
   el.scrollTop = el.scrollHeight;
 }
 async function sendAI() {
   const inp = $('#aiIn'), btn = $('#aiSend'), text = inp.value.trim();
   if (!text || btn.disabled) return;
+  if (RESTORE_RE.test(text)) { inp.value = ''; aiLog.length = 0; aiLog.push({who: 'me', text}, {who: 'ai', text: '✓ ' + restoreAI(ALL_RE.test(text))}); return drawAILog(); }
   aiLog.push({who: 'me', text}); inp.value = ''; btn.disabled = true; btn.textContent = 'AI đang làm…';
   aiLog.push({who: 'ai wait', text: 'Đang xử lý…'}); drawAILog();
   try {
     const r = await apiCall(`/api/jobs/${JOB}/ai-edit`, {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({prompt: text, timeline: TL, selected: [...sel]})});
-    const n = applyAIOps(r.ops || []);
+      body: JSON.stringify({prompt: text, timeline: TL, selected: [...sel],
+        presets: Object.keys(window.TLPlayer?.FILTER_PRESETS || {}), transitions: TRANS.map((t) => t[0])})});
+    const before = snap(), n = applyAIOps(r.ops || []);
+    if (n) { aiSnaps.push(before); if (aiSnaps.length > 10) aiSnaps.shift(); saveAISnaps(); }
     // làm xong -> dọn câu lệnh cũ, chỉ giữ kết quả lần gần nhất cho nhẹ
     aiLog.length = 0; aiLog.push({who: 'ai', text: '✓ ' + (r.reply || 'Xong.') + (n ? ` (${n} thay đổi)` : '')});
   } catch (e) { aiLog.pop(); aiLog.push({who: 'ai err', text: '⚠ ' + e.message}); }
@@ -923,7 +943,7 @@ async function sendAI() {
 }
 /* Xuất xong: bỏ lịch sử hoàn tác + nhật ký AI trong bộ nhớ, xoá file tạm trên máy (giữ video đã xuất). */
 async function cleanupAfterExport() {
-  hist.length = 0; fut.length = 0; lastSnap = snap(); aiLog.length = 0; drawAILog();
+  hist.length = 0; fut.length = 0; lastSnap = snap(); aiLog.length = 0; aiSnaps = []; saveAISnaps(); drawAILog();
   $('#undo').disabled = $('#redo').disabled = true;
   try {
     const r = await apiCall(`/api/jobs/${JOB}/cleanup`, {method: 'POST'});
@@ -934,11 +954,29 @@ function applyAIOps(ops) {
   let n = 0;
   const byId = (id) => TL.clips.find((c) => c.id === id);
   const ids = (o) => (Array.isArray(o.ids) ? o.ids : o.id ? [o.id] : []).map(byId).filter(Boolean);
+  const trOK = new Set(TRANS.map((t) => t[0]));
   for (const o of ops) {
-    if (o.op === 'update' && o.set) for (const c of ids(o)) { for (const [k, v] of Object.entries(o.set)) if (k !== 'id') setK(c, k, v); n++; }
+    if (o.op === 'update' && o.set) for (const c of ids(o)) {
+      for (const [k, v] of Object.entries(o.set)) if (k !== 'id') setK(c, k, v);
+      if (c.transition && !trOK.has(c.transition.type)) c.transition.type = 'fade'; // tên lạ -> mờ chéo
+      n++;
+    }
     else if (o.op === 'delete') { const del = new Set(ids(o).map((c) => c.id)); TL.clips = TL.clips.filter((c) => !del.has(c.id)); n += del.size; }
-    else if (o.op === 'add' && o.clip && TL.tracks.some((t) => t.id === o.clip.track)) { TL.clips.push({start: 0, dur: 3, ...o.clip, id: uid()}); n++; }
-    else if (o.op === 'timeline' && o.set) for (const [k, v] of Object.entries(o.set)) if (['filter', 'width', 'height', 'background'].includes(k)) { TL[k] = v; n++; }
+    else if (o.op === 'add' && o.clip) {
+      const {trackName, ...c} = o.clip;
+      let t = TL.tracks.find((x) => x.id === c.track) || (trackName && TL.tracks.find((x) => x.name === trackName));
+      if (!t || t.kind === 'main' && c.type !== 'video' && c.type !== 'image') { t = newTrack('mixed', 0); if (trackName) t.name = trackName; }
+      TL.clips.push({start: 0, dur: 3, ...c, track: t.id, id: uid()}); n++;
+    }
+    else if (o.op === 'timeline' && o.set) for (let [k, v] of Object.entries(o.set)) {
+      if (!['filter', 'width', 'height', 'background'].includes(k)) continue;
+      if (k === 'filter' && v && typeof v === 'object') {
+        // AI hay trả 0.2 thay vì 20 -> quy về thang -100..100
+        v = {...(TL.filter || {}), ...v};
+        for (const f of ['brightness', 'contrast', 'saturation', 'temperature', 'tint', 'vignette', 'fade', 'hue']) if (typeof v[f] === 'number' && v[f] !== 0 && Math.abs(v[f]) <= 1) v[f] = Math.round(v[f] * 100);
+      }
+      TL[k] = v; n++;
+    }
   }
   if (n) { sel = new Set([...sel].filter(byId)); commit(); }
   return n;

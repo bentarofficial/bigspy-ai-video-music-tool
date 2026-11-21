@@ -564,11 +564,15 @@ Các thao tác được phép:
 - {"op":"update","ids":["<clip id>",...],"set":{"<khoá>": <giá trị>, ...}}  // khoá có thể có dấu chấm, vd "subtitle.color", "transition.type"
 - {"op":"delete","ids":["<clip id>",...]}
 - {"op":"add","clip":{"track":"<track id>","type":"text","start":0,"dur":3,"name":"...","title":{"text":"...","fontSize":80,"color":"#ffffff"}}}
-- {"op":"timeline","set":{"filter":{"preset":"...","intensity":1,"brightness":0,"contrast":0,"saturation":0,"temperature":0,"vignette":0},"width":1080,"height":1920,"background":"#000000"}}
+  // nếu cần track mới (vd chưa có track Tiêu đề) thì đặt "track":"new" và "trackName":"Tiêu đề"
+- {"op":"timeline","set":{"filter":{"preset":"warm","intensity":1,"brightness":0,"contrast":0,"saturation":0,"temperature":0,"tint":0,"vignette":0,"hue":0,"fade":0},"width":1080,"height":1920,"background":"#000000"}}
+  // filter: intensity 0-1; brightness/contrast/saturation/temperature/tint -100..100; vignette/fade 0..100; hue -180..180.
+  // Khi đổi filter, giữ nguyên các giá trị cũ không liên quan. "Tăng nhẹ" ~ 15-25.
+  // preset: {presets}
 
 Quy ước clip: start/dur tính bằng giây; video có volume (0-2), dim (0-1, làm tối), fit ("cover"/"contain"),
 scale, x, y (% vị trí, 50 = giữa), kenBurns (bool), speed, fadeIn/fadeOut (giây),
-transition {"type": "fade|dissolve-zoom|blur-dissolve|soft-push|light-leak|slide-left|slide-right|wipe-left|...", "dur": 0.5}.
+transition {"type": "<một trong: {transitions}>", "dur": 0.5}. "Mờ chéo" = "fade".
 Câu lời (type "lyrics") có subtitle {mode: karaoke|preview|full, fontFamily, fontSize, color, highlightColor,
 strokeColor, strokeWidth, uppercase, position: bottom|center|top}. Không sửa nội dung chữ của câu lời.
 Khi đổi kiểu phụ đề, áp dụng cho MỌI clip lyrics. Chỉ dùng id có trong timeline. Không tự bịa file media mới.
@@ -608,6 +612,8 @@ def ai_edit(job_id: str, body: dict):
         raise HTTPException(400, "Chưa kết nối Claude CLI hay Codex CLI (vào Cài đặt > Kết nối)")
     prompt = (AI_EDIT_PROMPT.replace("{timeline}", json.dumps(_compact_timeline(tl), ensure_ascii=False))
               .replace("{selected}", json.dumps(body.get("selected") or [], ensure_ascii=False))
+              .replace("{presets}", ", ".join(body.get("presets") or []) or "warm, cool, cinematic, vintage, bw")
+              .replace("{transitions}", ", ".join(body.get("transitions") or []) or "fade, slide-left, wipe-left")
               .replace("{request}", req))
     try:
         out = llm.ask(prompt, effort="low", timeout=300)
