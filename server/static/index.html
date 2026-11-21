@@ -114,7 +114,7 @@ textarea{min-height:110px;resize:vertical;line-height:1.6}
 label.switch{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--text);font-size:13px;cursor:pointer;margin:12px 0 0}
 label.switch input{appearance:none;width:36px;height:20px;padding:0;border-radius:99px;background:#2c2c31;border:0;position:relative;flex:none;cursor:pointer;transition:.2s}
 label.switch input::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:.2s}
-label.switch input:checked{background:var(--acc)}label.switch input:checked::after{left:19px}
+label.switch input:checked{background:#22c55e}label.switch input:checked::after{left:19px}
 label.switch small{display:block;color:var(--dim);font-size:11px}
 
 button{background:var(--grad);color:#111;border:0;border-radius:10px;padding:9px 15px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:transform .12s,filter .15s,box-shadow .15s;box-shadow:0 6px 20px -8px rgba(0,0,0,0)}
@@ -199,7 +199,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
 <div class="dock"><button type="button" class="pbtn" data-panel="side" title="Bật/tắt thanh bên (Ctrl+B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button><button type="button" class="pbtn" data-panel="create" title="Bật/tắt bảng Tạo video (Ctrl+\)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M15 4v16"/></svg></button></div>
 <div class="app">
 <aside>
-  <div class="brand"><div class="logo">🎵</div><div><b>Music Video Studio</b><small>Whisper · Claude · Remotion</small></div><button type="button" class="pbtn" data-panel="side" title="Ẩn thanh bên"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></div>
+  <div class="brand"><div class="logo">🎵</div><div><b>Music Video Studio</b><small>Whisper · Claude/Codex · Remotion</small></div><button type="button" class="pbtn" data-panel="side" title="Ẩn thanh bên"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></div>
   <div class="navlabel">Dự án <span id="jcount"></span><button type="button" id="newBlank" title="Tạo dự án trống để tự cắt ghép" style="margin-left:auto;margin-right:6px;padding:3px 8px;font-size:11px;border-radius:7px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#e6e6e9;cursor:pointer;text-transform:none;letter-spacing:0">＋ Dự án trống</button></div>
   <div class="legend"><span><i style="background:var(--warn)"></i>Đang chạy</span><span><i style="background:var(--ok)"></i>Xong</span><span><i style="background:var(--err)"></i>Lỗi</span></div>
   <div class="jobs" id="jobs"><span class="muted" style="padding:8px 10px">Chưa có</span></div>
@@ -216,6 +216,10 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
     <div class="svc" id="svcClaude">
       <div class="svc-top"><span class="svc-ic">🧠</span><div class="svc-name"><b>Claude CLI</b><small id="k2"></small></div><span class="pill" id="clPill"></span></div>
       <button class="ghost" id="clToggle"></button>
+    </div>
+    <div class="svc" id="svcCodex">
+      <div class="svc-top"><span class="svc-ic">🤖</span><div class="svc-name"><b>ChatGPT Codex CLI</b><small id="k3"></small></div><span class="pill" id="cxPill"></span></div>
+      <button class="ghost" id="cxToggle"></button>
     </div>
     <div class="svc" id="svcUpd">
       <div class="svc-top"><span class="svc-ic">⬆</span><div class="svc-name"><b>Phiên bản</b><small id="updVer"></small></div><span class="pill" id="updPill"></span></div>
@@ -581,10 +585,18 @@ async function loadKeys() {
   const clOn = keys.claudeCli && keys.claudeEnabled;
   $('#clPill').textContent = !keys.claudeCli ? 'Không thấy' : clOn ? 'Đã kết nối' : 'Đã ngắt';
   $('#clPill').className = 'pill' + (clOn ? ' on' : !keys.claudeCli ? ' warn' : '');
-  $('#k2').textContent = !keys.claudeCli ? 'Chưa cài lệnh claude' : clOn ? 'Chọn cảnh theo lời bài hát' : 'Dùng ô Chủ đề hình ảnh';
+  $('#k2').textContent = !keys.claudeCli ? 'Chưa cài lệnh claude' : clOn ? 'Chọn cảnh theo lời bài hát' : keys.codexCli && keys.codexEnabled ? 'Đã ngắt — Codex chọn cảnh thay' : 'Dùng ô Chủ đề hình ảnh';
   $('#clToggle').hidden = !keys.claudeCli;
   $('#clToggle').textContent = clOn ? 'Huỷ kết nối' : 'Kết nối lại';
   $('#clToggle').className = clOn ? 'ghost danger' : '';
+  const cxOn = keys.codexCli && keys.codexEnabled;
+  $('#cxPill').textContent = !keys.codexCli ? 'Không thấy' : cxOn ? 'Đã kết nối' : 'Đã ngắt';
+  $('#cxPill').className = 'pill' + (cxOn ? ' on' : !keys.codexCli ? ' warn' : '');
+  $('#k3').textContent = !keys.codexCli ? 'Chưa cài lệnh codex' : !cxOn ? 'Không dùng làm dự phòng'
+    : clOn ? 'Dự phòng khi Claude lỗi' : 'Đang thay Claude chọn cảnh';
+  $('#cxToggle').hidden = !keys.codexCli;
+  $('#cxToggle').textContent = cxOn ? 'Huỷ kết nối' : 'Kết nối lại';
+  $('#cxToggle').className = cxOn ? 'ghost danger' : '';
 }
 $('#saveKeys').onclick = async () => {
   if (!$('#pix').value.trim()) return $('#pix').focus();
@@ -601,6 +613,12 @@ $('#pixOff').onclick = async () => {
 $('#clToggle').onclick = async () => {
   const on = keys.claudeCli && keys.claudeEnabled;
   try { await api(`/api/settings/claude/${on ? 'disconnect' : 'connect'}`, {method: 'POST'}); } catch (e) { alert(e.message); }
+  loadKeys();
+};
+
+$('#cxToggle').onclick = async () => {
+  const on = keys.codexCli && keys.codexEnabled;
+  try { await api(`/api/settings/codex/${on ? 'disconnect' : 'connect'}`, {method: 'POST'}); } catch (e) { alert(e.message); }
   loadKeys();
 };
 

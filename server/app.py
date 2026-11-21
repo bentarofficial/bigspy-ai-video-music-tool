@@ -136,7 +136,9 @@ def get_settings():
     mask = lambda v: (v[:4] + "…" + v[-4:]) if v and len(v) > 10 else ("đã đặt" if v else "")
     return {"PIXABAY_API_KEY": mask(os.environ.get("PIXABAY_API_KEY", "")),
             "claudeCli": bool(shutil.which("claude")),
-            "claudeEnabled": os.environ.get("CLAUDE_DISABLED", "") != "1"}
+            "claudeEnabled": os.environ.get("CLAUDE_DISABLED", "") != "1",
+            "codexCli": bool(shutil.which("codex")),
+            "codexEnabled": os.environ.get("CODEX_DISABLED", "") != "1"}
 
 
 def _set_env(key: str, val: str | None) -> None:
@@ -168,6 +170,8 @@ def toggle_service(service: str, action: str):
         _set_env("PIXABAY_API_KEY", None)
     elif service == "claude":
         _set_env("CLAUDE_DISABLED", None if action == "connect" else "1")
+    elif service == "codex":
+        _set_env("CODEX_DISABLED", None if action == "connect" else "1")
     else:
         raise HTTPException(404, "Dịch vụ không tồn tại")
     return get_settings()

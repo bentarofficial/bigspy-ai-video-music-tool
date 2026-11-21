@@ -10,11 +10,12 @@ nên tìm nhầm bài trùng tên sẽ bị loại.
 import json
 import os
 import re
-import shutil
-import subprocess
+
+
 import urllib.parse
 import urllib.request
 
+from . import llm
 from .lyrics import match_score
 
 UA = {"User-Agent": "ai-music-video-tool/1.0 (+https://lrclib.net)"}
@@ -57,8 +58,7 @@ def lrclib_candidates(title: str, artist: str = "") -> list[dict]:
 
 
 def claude_search(heard: str, title: str, artist: str, model: str = "") -> list[dict]:
-    claude = shutil.which("claude") if os.environ.get("CLAUDE_DISABLED") != "1" else None
-    if not claude:
+    if not llm.available():
         return []
     prompt = f"""Find the official lyrics of the song that contains these lines (transcribed by speech
 recognition, so some words are WRONG — they sound similar to the real words):
@@ -72,16 +72,12 @@ Search the web (Google, lyric sites, music platforms) using distinctive phrases 
 Make sure the lyrics you return really contain these lines. Reply with ONLY this JSON, nothing else:
 {{"title": "...", "artist": "...", "url": "...", "lyrics": "full lyrics, one line per line"}}
 If you cannot find it, reply {{"lyrics": ""}}."""
-    env = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
-    cmd = [claude, "-p", "--model", model or os.environ.get("MV_CLAUDE_MODEL") or "claude-sonnet-5-5",
-           "--output-format", "text", "--tools", "WebSearch,WebFetch",
-           "--allowedTools", "WebSearch,WebFetch", "--no-session-persistence"]
     try:
-        r = subprocess.run(cmd, input=prompt, capture_output=True, text=True, encoding="utf-8", timeout=420,
-                           env=env, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-        data = json.loads(re.search(r"\{.*\}", r.stdout, re.S).group(0))
+        out = llm.ask(prompt, model or os.environ.get("MV_CLAUDE_MODEL") or "claude-sonnet-5-5",
+                      web=True, timeout=420)
+        data = json.loads(re.search(r"\{.*\}", out, re.S).group(0))
     except Exception as e:
-        print(f"  (Claude tìm lời lỗi: {e})")
+        print(f"  (AI tìm lời lỗi: {e})")
         return []
     text = str(data.get("lyrics") or "").strip()
     if not text:
@@ -106,7 +102,7 @@ def find_reference(heard: str, title: str = "", artist: str = "", claude_model: 
         print(f"  LRCLIB tốt nhất: {b['source']} (khớp {b['score']:.0%})")
     if b and b["score"] >= MIN_SCORE:
         return b
-    print("  tìm lời trên web bằng Claude (WebSearch)…")
+    print("  tìm lời trên web bằng AI (Claude / Codex)…")
     w = best(claude_search(heard, t, artist, claude_model))
     if w:
         print(f"  Web: {w['source']} (khớp {w['score']:.0%})")
