@@ -39,7 +39,12 @@ body.resizing{cursor:col-resize;user-select:none}body.resizing iframe,body.resiz
 .pbtn:hover{background:rgba(255,255,255,.07);color:var(--text);filter:none}
 .pbtn.on{color:#e6e6e9}
 .pbtn svg{width:17px;height:17px}
-.dock{position:fixed;top:14px;right:18px;z-index:30;display:flex;gap:2px;padding:4px;border-radius:12px;background:rgba(20,20,22,.8);border:1px solid var(--line2);backdrop-filter:blur(14px)}
+.edge{display:none;position:relative;width:0;flex:none;z-index:30}
+.app.no-side>.edge[data-for=side],.app.no-create>.edge[data-for=create]{display:block}
+.edge button{position:absolute;left:0;top:50%;transform:translateY(-50%);width:22px;height:56px;padding:0;border-radius:0 10px 10px 0;background:#2a2a30;border:1px solid rgba(255,255,255,.18);border-left:0;color:#e6e6e9;box-shadow:2px 0 10px rgba(0,0,0,.4);display:grid;place-items:center}
+.edge button:hover{background:#3a3a42;color:var(--text);width:26px;filter:none}
+.edge svg{width:15px;height:15px}
+.app.no-side.no-create>.edge[data-for=create] button{top:calc(50% + 66px)}
 .brand .pbtn,.colhead .pbtn{margin-left:auto}
 .colhead{display:flex;align-items:flex-start;gap:10px}
 aside{background:rgba(12,12,14,.75);backdrop-filter:blur(20px);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
@@ -186,7 +191,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
 .legend{display:flex;gap:10px;padding:6px 20px 0;color:var(--dim);font-size:10.5px}.legend i{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:4px;vertical-align:1px}
 /* ---------- responsive ---------- */
 @media(max-width:1000px){
-  body{overflow:auto}.app{display:block;height:auto}.app>aside,.app>.create{width:auto}.rz,.dock{display:none}
+  body{overflow:auto}.app{display:block;height:auto}.app>aside,.app>.create{width:auto}.rz,.edge{display:none!important}
   aside{border-right:0;border-bottom:1px solid var(--line)}.jobs{max-height:220px}
   .col{overflow:visible}.create{border-right:0}.detail{padding:16px}
   .colhead,.steps,.sticky-go{padding-left:16px;padding-right:16px}
@@ -196,10 +201,10 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
 </style>
 </head>
 <body>
-<div class="dock"><button type="button" class="pbtn" data-panel="side" title="Bật/tắt thanh bên (Ctrl+B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button><button type="button" class="pbtn" data-panel="create" title="Bật/tắt bảng Tạo video (Ctrl+\)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M15 4v16"/></svg></button></div>
 <div class="app">
+<div class="edge" data-for="side"><button type="button" data-panel="side" title="Hiện thanh bên (Ctrl+B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div>
 <aside>
-  <div class="brand"><div class="logo">🎵</div><div><b>Music Video Studio</b><small>Whisper · Claude/Codex · Remotion</small></div><button type="button" class="pbtn" data-panel="side" title="Ẩn thanh bên"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></div>
+  <div class="brand"><div class="logo">🎵</div><div><b>Music Video Studio</b><small>Whisper · Claude/Codex · Remotion</small></div><button type="button" class="pbtn" data-panel="side" title="Ẩn thanh bên (Ctrl+B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></div>
   <div class="navlabel">Dự án <span id="jcount"></span><button type="button" id="newBlank" title="Tạo dự án trống để tự cắt ghép" style="margin-left:auto;margin-right:6px;padding:3px 8px;font-size:11px;border-radius:7px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.35);color:#e6e6e9;cursor:pointer;text-transform:none;letter-spacing:0">＋ Dự án trống</button></div>
   <div class="legend"><span><i style="background:var(--warn)"></i>Đang chạy</span><span><i style="background:var(--ok)"></i>Xong</span><span><i style="background:var(--err)"></i>Lỗi</span></div>
   <div class="jobs" id="jobs"><span class="muted" style="padding:8px 10px">Chưa có</span></div>
@@ -233,7 +238,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
 
 <section class="col create">
   <form id="f">
-    <div class="colhead"><div><h1>Tạo video mới</h1><p>Nhạc → phụ đề → cảnh quay, tự động.</p></div><button type="button" class="pbtn" data-panel="create" title="Ẩn bảng Tạo video"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></div>
+    <div class="colhead"><div><h1>Tạo video mới</h1><p>Nhạc → phụ đề → cảnh quay, tự động.</p></div><button type="button" class="pbtn" data-panel="create" title="Ẩn bảng Tạo video (Ctrl+\)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 6-6 6 6 6"/></svg></button></div>
     <div class="steps">
       <div class="step">
         <div class="step-h"><span class="num">1</span><h3>Âm thanh</h3></div>
@@ -312,6 +317,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
   </form>
 </section>
 <div class="rz" id="rz2" data-var="--w-create" data-min="340" data-max="760" title="Kéo để đổi độ rộng · nháy đúp để đặt lại"></div>
+<div class="edge" data-for="create"><button type="button" data-panel="create" title="Hiện bảng Tạo video (Ctrl+\)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></button></div>
 
 <section class="col detail" id="detail">
 <div class="empty" id="pvEmpty"></div>
@@ -742,7 +748,6 @@ for (const rz of document.querySelectorAll('.rz')) {
 }
 function setPanel(name, show) {
   app.classList.toggle('no-' + name, !show); store('ui-' + name, show ? '1' : '0');
-  document.querySelectorAll(`.dock [data-panel="${name}"]`).forEach(b => b.classList.toggle('on', show));
   if (show) requestAnimationFrame(drawWave);
 }
 for (const n of ['side', 'create']) setPanel(n, store('ui-' + n) !== '0');
