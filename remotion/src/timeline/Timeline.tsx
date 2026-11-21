@@ -128,11 +128,20 @@ const TransitionWrap: React.FC<{tr: Transition; d: number; children: React.React
 	if (f >= d) return <>{children}</>;
 	const p = interpolate(f, [0, d], [0, 1], clamp);
 	const e = 1 - Math.pow(1 - p, 3); // ease-out
+	const s = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; // ease-in-out cho kiểu mượt
 	let style: React.CSSProperties = {};
 	let cover: React.ReactNode = null;
 	const pct = (v: number) => `${v * 100}%`;
 	switch (tr.type) {
 		case 'fade': style = {opacity: p}; break;
+		// ---- kết hợp, mượt (mặc định khi AI tạo video) ----
+		case 'dissolve-zoom': style = {opacity: s, transform: `scale(${1.08 - 0.08 * s})`}; break;
+		case 'blur-dissolve': style = {opacity: s, filter: `blur(${(1 - s) * 14}px)`}; break;
+		case 'soft-push': style = {opacity: s, transform: `translateX(${(1 - s) * 18}%) scale(${1.04 - 0.04 * s})`}; break;
+		case 'light-leak':
+			style = {opacity: s};
+			cover = <AbsoluteFill style={{background: 'radial-gradient(ellipse at 70% 30%, rgba(255,214,150,.95), rgba(255,140,60,.45) 45%, transparent 75%)', opacity: (1 - Math.abs(p - 0.5) * 2) * 0.85, mixBlendMode: 'screen'}} />;
+			break;
 		case 'fadeblack':
 		case 'fadewhite': {
 			const col = tr.type === 'fadeblack' ? '0,0,0' : '255,255,255';

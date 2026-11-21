@@ -1,6 +1,7 @@
 import React from 'react';
 import {
 	AbsoluteFill,
+	Easing,
 	interpolate,
 	Loop,
 	OffthreadVideo,
@@ -8,7 +9,12 @@ import {
 	useCurrentFrame,
 	useVideoConfig,
 } from 'remotion';
-import {linearTiming, TransitionSeries, type TransitionPresentation} from '@remotion/transitions';
+import {
+	linearTiming,
+	TransitionSeries,
+	type TransitionPresentation,
+	type TransitionPresentationComponentProps,
+} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
 import {slide} from '@remotion/transitions/slide';
 import {wipe} from '@remotion/transitions/wipe';
@@ -16,8 +22,61 @@ import type {Scene} from './schema';
 
 const DIRS = ['from-right', 'from-left', 'from-bottom', 'from-top'] as const;
 
+type SmoothKind = 'dissolve-zoom' | 'blur-dissolve' | 'soft-push' | 'light-leak';
+const SMOOTH = new Set<string>(['dissolve-zoom', 'blur-dissolve', 'soft-push', 'light-leak']);
+
+/** Chuyển cảnh kết hợp: CẢ cảnh cũ lẫn cảnh mới cùng chuyển động (mờ chéo + zoom / nhoè / đẩy / ánh sáng)
+ *  nên mắt không thấy điểm cắt -> mượt, không khựng. */
+const SmoothComp: React.FC<TransitionPresentationComponentProps<{kind: SmoothKind; dir: number}>> = ({
+	children,
+	presentationDirection,
+	presentationProgress: p,
+	passedProps: {kind, dir},
+}) => {
+	const enter = presentationDirection === 'entering';
+	const peak = 1 - Math.abs(p - 0.5) * 2; // 0 -> 1 (giữa) -> 0
+	let style: React.CSSProperties = {};
+	let glow: React.ReactNode = null;
+	switch (kind) {
+		case 'dissolve-zoom':
+			style = enter ? {opacity: p, transform: `scale(${1.08 - 0.08 * p})`} : {transform: `scale(${1 + 0.08 * p})`};
+			break;
+		case 'blur-dissolve':
+			style = enter ? {opacity: p, filter: `blur(${(1 - p) * 14}px)`} : {filter: `blur(${p * 14}px)`};
+			break;
+		case 'soft-push':
+			style = enter
+				? {opacity: p, transform: `translateX(${dir * (1 - p) * 18}%) scale(${1.04 - 0.04 * p})`}
+				: {transform: `translateX(${-dir * p * 18}%) scale(${1 + 0.04 * p})`, filter: `blur(${p * 6}px)`};
+			break;
+		case 'light-leak':
+			style = enter ? {opacity: p} : {filter: `brightness(${1 + p * 0.6})`};
+			if (enter) {
+				glow = (
+					<AbsoluteFill
+						style={{background: 'radial-gradient(ellipse at 70% 30%, rgba(255,214,150,.95), rgba(255,140,60,.45) 45%, transparent 75%)',
+							opacity: peak * 0.85, mixBlendMode: 'screen'}}
+					/>
+				);
+			}
+			break;
+	}
+	return (
+		<AbsoluteFill>
+			<AbsoluteFill style={style}>{children}</AbsoluteFill>
+			{glow}
+		</AbsoluteFill>
+	);
+};
+const smooth = (kind: SmoothKind, dir: number): TransitionPresentation<{kind: SmoothKind; dir: number}> => ({
+	component: SmoothComp,
+	props: {kind, dir},
+});
+const EASE = Easing.inOut(Easing.cubic);
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const presentation = (kind: Scene['transition'], i: number): TransitionPresentation<any> => {
+	if (SMOOTH.has(kind)) return smooth(kind as SmoothKind, i % 2 ? -1 : 1);
 	if (kind === 'slide') return slide({direction: DIRS[i % DIRS.length]});
 	if (kind === 'wipe') return wipe({direction: DIRS[(i + 1) % DIRS.length]});
 	return fade();
@@ -84,7 +143,7 @@ export const Scenes: React.FC<{scenes: Scene[]; transitionSeconds: number; kenBu
 						{tr > 0 ? (
 							<TransitionSeries.Transition
 								presentation={presentation(next.transition, i)}
-								timing={linearTiming({durationInFrames: tr})}
+								timing={linearTiming({durationInFrames: tr, easing: EASE})}
 							/>
 						) : null}
 					</React.Fragment>

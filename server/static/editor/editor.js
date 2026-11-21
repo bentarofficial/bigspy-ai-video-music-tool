@@ -887,6 +887,63 @@ function addCover() {
   toast('Kéo khung trên màn hình xem trước để di chuyển, chấm góc để đổi kích thước');
 }
 
+/* ---- sửa bằng AI ---- */
+const aiLog = [];
+const AI_EXAMPLES = ['Đổi màu phụ đề sang vàng, viền đen dày hơn', 'Thêm chuyển cảnh mờ chéo 0.6s cho mọi clip', 'Áp bộ lọc ấm, tăng tương phản nhẹ', 'Làm tối các video 30%', 'Thêm tiêu đề 3 giây đầu'];
+function renderAI(box) {
+  box.innerHTML = `<h3>Sửa bằng AI</h3>
+    <div class="ailog" id="aiLog"></div>
+    <div class="aiex">${AI_EXAMPLES.map((x) => `<button class="ghost" data-aiex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <textarea id="aiIn" rows="3" placeholder="Mô tả thay đổi bạn muốn… (Ctrl+Enter để gửi)"></textarea>
+    <div class="btnrow"><button class="ghost" id="aiSend">✦ Gửi cho AI</button></div>
+    <p class="hint">AI đọc timeline hiện tại (và clip đang chọn) rồi tự chỉnh. Không ưng thì Hoàn tác (Ctrl+Z).</p>`;
+  drawAILog();
+  $$('[data-aiex]', box).forEach((b) => (b.onclick = () => { $('#aiIn').value = b.dataset.aiex; $('#aiIn').focus(); }));
+  $('#aiSend').onclick = sendAI;
+  $('#aiIn').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendAI(); };
+}
+function drawAILog() {
+  const el = $('#aiLog'); if (!el) return;
+  el.innerHTML = aiLog.map((m) => `<div class="aimsg ${m.who}">${esc(m.text)}</div>`).join('') || '<p class="hint">Chọn một ví dụ bên dưới hoặc tự nhập câu lệnh.</p>';
+  el.scrollTop = el.scrollHeight;
+}
+async function sendAI() {
+  const inp = $('#aiIn'), btn = $('#aiSend'), text = inp.value.trim();
+  if (!text || btn.disabled) return;
+  aiLog.push({who: 'me', text}); inp.value = ''; btn.disabled = true; btn.textContent = 'AI đang làm…';
+  aiLog.push({who: 'ai wait', text: 'Đang xử lý…'}); drawAILog();
+  try {
+    const r = await apiCall(`/api/jobs/${JOB}/ai-edit`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: text, timeline: TL, selected: [...sel]})});
+    const n = applyAIOps(r.ops || []);
+    // làm xong -> dọn câu lệnh cũ, chỉ giữ kết quả lần gần nhất cho nhẹ
+    aiLog.length = 0; aiLog.push({who: 'ai', text: '✓ ' + (r.reply || 'Xong.') + (n ? ` (${n} thay đổi)` : '')});
+  } catch (e) { aiLog.pop(); aiLog.push({who: 'ai err', text: '⚠ ' + e.message}); }
+  btn.disabled = false; btn.textContent = '✦ Gửi cho AI'; drawAILog();
+}
+/* Xuất xong: bỏ lịch sử hoàn tác + nhật ký AI trong bộ nhớ, xoá file tạm trên máy (giữ video đã xuất). */
+async function cleanupAfterExport() {
+  hist.length = 0; fut.length = 0; lastSnap = snap(); aiLog.length = 0; drawAILog();
+  $('#undo').disabled = $('#redo').disabled = true;
+  try {
+    const r = await apiCall(`/api/jobs/${JOB}/cleanup`, {method: 'POST'});
+    if (r.freed > 1e6) toast(`🧹 Đã dọn ${(r.freed / 1e6).toFixed(1)} MB file tạm`);
+  } catch {}
+}
+function applyAIOps(ops) {
+  let n = 0;
+  const byId = (id) => TL.clips.find((c) => c.id === id);
+  const ids = (o) => (Array.isArray(o.ids) ? o.ids : o.id ? [o.id] : []).map(byId).filter(Boolean);
+  for (const o of ops) {
+    if (o.op === 'update' && o.set) for (const c of ids(o)) { for (const [k, v] of Object.entries(o.set)) if (k !== 'id') setK(c, k, v); n++; }
+    else if (o.op === 'delete') { const del = new Set(ids(o).map((c) => c.id)); TL.clips = TL.clips.filter((c) => !del.has(c.id)); n += del.size; }
+    else if (o.op === 'add' && o.clip && TL.tracks.some((t) => t.id === o.clip.track)) { TL.clips.push({start: 0, dur: 3, ...o.clip, id: uid()}); n++; }
+    else if (o.op === 'timeline' && o.set) for (const [k, v] of Object.entries(o.set)) if (['filter', 'width', 'height', 'background'].includes(k)) { TL[k] = v; n++; }
+  }
+  if (n) { sel = new Set([...sel].filter(byId)); commit(); }
+  return n;
+}
+
 /* ---- tab bên phải ---- */
 let rtab = 'props';
 function showRTab(n) {
@@ -899,6 +956,7 @@ function showRTab(n) {
 function renderSide(force) {
   if (rtab === 'props') return;
   const box = $(`.rbody[data-rbody="${rtab}"]`);
+  if (rtab === 'ai') { if (!box.firstChild) renderAI(box); return; }
   if (!force && box.contains(document.activeElement) && document.activeElement.tagName !== 'BUTTON') return;
   let h = '';
   if (rtab === 'style') {
@@ -1099,6 +1157,7 @@ async function exportVideo(opts) {
       $('#xbtns').innerHTML = `<a class="primary" style="text-decoration:none" href="/api/jobs/${JOB}/export-file?t=${Date.now()}" download>⬇ Tải xuống</a><button class="ghost" id="xopen">📂 Mở thư mục</button><button class="ghost" id="xclose2">Đóng</button>`;
       $('#xopen').onclick = () => apiCall(`/api/jobs/${JOB}/open-export`, {method: 'POST'}).catch((e) => toast(e.message));
       $('#xclose2').onclick = closeModal;
+      cleanupAfterExport();
     } else {
       $('#modal').hidden = false;
       $('#xmsg').innerHTML = `⚠ Xuất lỗi (${esc(j.status)}). <pre style="white-space:pre-wrap;max-height:200px;overflow:auto;font-size:11px">${esc(tail.slice(-1500))}</pre>`;
@@ -1213,7 +1272,9 @@ const ANIM_OUT = [
 	['blur', 'Tan mờ'], ['spin', 'Xoay ra'], ['flip', 'Lật'], ['drop', 'Rơi xuống'], ['glitch', 'Nhiễu (glitch)'],
 ];
 const TRANS = [
-  ['none', '⊘', 'Không'], ['fade', '◐', 'Mờ chéo'], ['fadeblack', '●', 'Qua đen'], ['fadewhite', '○', 'Qua trắng'], ['flash', '✦', 'Chớp sáng'],
+  ['none', '⊘', 'Không'],
+  ['dissolve-zoom', '✧', 'Hoà tan + phóng (mượt)'], ['blur-dissolve', '❂', 'Hoà tan nhoè (mượt)'], ['soft-push', '➜', 'Đẩy mềm (mượt)'], ['light-leak', '☼', 'Hoà sáng (mượt)'],
+  ['fade', '◐', 'Mờ chéo'], ['fadeblack', '●', 'Qua đen'], ['fadewhite', '○', 'Qua trắng'], ['flash', '✦', 'Chớp sáng'],
   ['slide-left', '⇠', 'Trượt trái'], ['slide-right', '⇢', 'Trượt phải'], ['slide-up', '⇡', 'Trượt lên'], ['slide-down', '⇣', 'Trượt xuống'],
   ['wipe-left', '◧', 'Quét trái'], ['wipe-right', '◨', 'Quét phải'], ['wipe-up', '⬒', 'Quét lên'], ['wipe-down', '⬓', 'Quét xuống'],
   ['circle', '◎', 'Vòng tròn'], ['zoom-in', '⊕', 'Phóng vào'], ['zoom-out', '⊖', 'Thu ra'], ['blur', '≋', 'Làm mờ'], ['spin', '↻', 'Xoay'],
@@ -1409,3 +1470,27 @@ function bindPhase2() {
   $('#safe').onclick = () => { safeOn = !safeOn; $('#safe').classList.toggle('on', safeOn); drawOverlay(); };
   bindOverlay(); bindPanels();
 }
+
+/* ---- di chuột lên khối trên timeline -> hiện đầy đủ chữ phía trên ---- */
+(() => {
+  const tip = document.createElement('div'); tip.className = 'cliptip'; tip.hidden = true; document.body.appendChild(tip);
+  let cur = null, down = false;
+  const hide = () => { tip.hidden = true; cur = null; };
+  document.addEventListener('mousedown', () => { down = true; hide(); });
+  document.addEventListener('mouseup', () => { down = false; });
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest?.('#canvas .clip');
+    if (!el || down) return hide();
+    if (el === cur) return;
+    const c = TL?.clips.find((x) => x.id === el.dataset.id); if (!c) return hide();
+    const text = c.type === 'text' ? c.title?.text : c.type === 'lyrics' ? (c.lines || []).map((l) => l.words.map((w) => w.text).join(' ')).join(' / ') || c.name : c.name;
+    if (!text) return hide();
+    cur = el;
+    tip.innerHTML = `<b>${esc(text)}</b><small>${fmt(c.start)} → ${fmt(c.start + c.dur)} · ${c.dur.toFixed(2)}s</small>`;
+    tip.hidden = false;
+    const r = el.getBoundingClientRect(), tw = tip.offsetWidth;
+    tip.style.left = Math.max(8, Math.min(innerWidth - tw - 8, r.left + r.width / 2 - tw / 2)) + 'px';
+    tip.style.top = Math.max(8, r.top - tip.offsetHeight - 8) + 'px';
+  });
+  document.addEventListener('scroll', hide, true);
+})();

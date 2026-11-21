@@ -1,10 +1,9 @@
-"""Web server localhost: tải nhạc lên, theo dõi tiến trình, chỉnh phụ đề/tiêu đề, render lại, mở Studio."""
+"""Web server localhost: tải nhạc lên, theo dõi tiến trình, chỉnh phụ đề/tiêu đề, render lại."""
 import json
 import os
 import re
 import secrets
 import shutil
-import socket
 import subprocess
 import sys
 import time
@@ -20,8 +19,9 @@ from make_video import slugify  # noqa: E402
 from musicvideo.config import OUTPUT_DIR, PUBLIC_DIR, REMOTION_DIR, SIZES, load_env  # noqa: E402
 
 UPLOADS = ROOT / "uploads"
+LOGOS = ROOT / "logos"  # thư viện logo kênh, giữ qua các lần mở app / cập nhật
+LOGO_EXT = {".png", ".webp", ".jpg", ".jpeg", ".svg"}
 ENV_FILE = ROOT / ".env"
-STUDIO_PORT = 3010
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # không bật cửa sổ console trên Windows
 
 app = FastAPI(title="AI Music Video Tool")
@@ -30,7 +30,6 @@ PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=PUBLIC_DIR), name="media")
 app.mount("/editor-assets", StaticFiles(directory=STATIC / "editor"), name="editor-assets")
 procs: dict[str, subprocess.Popen] = {}
-studio: dict = {"proc": None, "job": None}
 
 
 # ---------- tiện ích ----------
@@ -76,12 +75,6 @@ def spawn(job_id: str, d: Path, args: list[str]) -> None:
     meta = read_meta(d)
     meta["status"] = "running"
     write_meta(d, meta)
-
-
-def port_open(port: int) -> bool:
-    with socket.socket() as s:
-        s.settimeout(0.3)
-        return s.connect_ex(("127.0.0.1", port)) == 0
 
 
 # ---------- trang & cài đặt ----------
@@ -177,6 +170,57 @@ def toggle_service(service: str, action: str):
     return get_settings()
 
 
+# ---------- thư viện logo ----------
+def _logo_path(name: str) -> Path:
+    f = LOGOS / Path(name).name
+    if f.suffix.lower() not in LOGO_EXT or not f.is_file():
+        raise HTTPException(404, "Không có logo này")
+    return f
+
+
+@app.get("/api/logos")
+def list_logos():
+    if not LOGOS.exists():
+        return []
+    fs = sorted((f for f in LOGOS.iterdir() if f.suffix.lower() in LOGO_EXT), key=lambda f: f.stat().st_mtime, reverse=True)
+    return [{"name": f.name, "url": f"/api/logos/{f.name}?v={int(f.stat().st_mtime)}"} for f in fs]
+
+
+@app.get("/api/logos/{name}")
+def get_logo(name: str):
+    return FileResponse(_logo_path(name))
+
+
+@app.post("/api/logos")
+async def add_logo(file: UploadFile = File(...)):
+    name = file.filename or "logo.png"
+    try:
+        name = name.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    ext = Path(name).suffix.lower()
+    if ext not in LOGO_EXT:
+        raise HTTPException(400, "logo chỉ nhận png, webp, jpg, svg (nên dùng PNG nền trong suốt)")
+    data = await file.read()
+    if len(data) > 5_000_000:
+        raise HTTPException(400, "logo tối đa 5 MB")
+    LOGOS.mkdir(exist_ok=True)
+    stem = slugify(Path(name).stem)[:40] or "logo"
+    f = LOGOS / f"{stem}{ext}"
+    i = 2
+    while f.exists() and f.read_bytes() != data:  # trùng tên khác nội dung -> đánh số
+        f = LOGOS / f"{stem}-{i}{ext}"
+        i += 1
+    f.write_bytes(data)
+    return {"name": f.name}
+
+
+@app.delete("/api/logos/{name}")
+def delete_logo(name: str):
+    _logo_path(name).unlink()
+    return {"ok": True}
+
+
 # ---------- job ----------
 @app.post("/api/jobs")
 async def create_job(
@@ -191,6 +235,8 @@ async def create_job(
     color_filter: str = Form("none"), filter_intensity: float = Form(1.0),
     claude_model: str = Form(""), claude_effort: str = Form(""),
     start: str = Form(""), end: str = Form(""),
+    logo_name: str = Form(""), logo_position: str = Form("top-right"),
+    logo_size: float = Form(14), logo_opacity: float = Form(0.9),
 ):
     if audio.filename:
         try:  # tên file UTF-8 đôi khi bị giải mã nhầm thành latin-1 ("Tá»«ng" -> "Từng")
@@ -233,6 +279,13 @@ async def create_job(
     if e is not None and e > (s or 0): args += ["--end", f"{e:.3f}"]
     if separate: args.append("--separate")
     if no_lyrics: args.append("--no-lyrics")
+    if logo_name:
+        lf = _logo_path(logo_name)
+        shutil.copyfile(lf, d / f"logo{lf.suffix.lower()}")
+        args += ["--logo", str(d / f"logo{lf.suffix.lower()}"), "--logo-size", f"{max(3.0, min(50.0, logo_size)):.1f}",
+                 "--logo-opacity", f"{max(0.0, min(1.0, logo_opacity)):.2f}"]
+        if logo_position in {"top-right", "top-left", "bottom-right", "bottom-left"}:
+            args += ["--logo-position", logo_position]
     if lyrics.strip():
         (d / "lyrics_input.txt").write_text(lyrics, encoding="utf-8")
         args += ["--lyrics", str(d / "lyrics_input.txt")]
@@ -326,15 +379,13 @@ def rename_job(job_id: str, body: dict):
 def delete_job(job_id: str):
     """Xoá dự án: dừng tiến trình (nếu có), xoá thư mục output và file nhạc đã tải lên."""
     d = job_dir(job_id)
-    for p in (procs.pop(job_id, None), studio["proc"] if studio["job"] == job_id else None):
-        if p and p.poll() is None:
-            subprocess.run(f"taskkill /PID {p.pid} /T /F", shell=True, capture_output=True)
-            try:
-                p.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                pass
-    if studio["job"] == job_id:
-        studio.update(proc=None, job=None)
+    p = procs.pop(job_id, None)
+    if p and p.poll() is None:
+        subprocess.run(f"taskkill /PID {p.pid} /T /F", shell=True, capture_output=True)
+        try:
+            p.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            pass
     for _ in range(5):  # Windows có thể giữ khoá file thêm chút sau khi kill
         try:
             shutil.rmtree(d)
@@ -356,29 +407,6 @@ def rerender(job_id: str):
         raise HTTPException(409, "job đang chạy")
     spawn(job_id, d, ["--render-only", str(d / "props.json")])
     return {"ok": True}
-
-
-@app.post("/api/jobs/{job_id}/studio")
-def open_studio(job_id: str):
-    """Mở Remotion Studio để xem trước & chỉnh trực quan (màu, cỡ chữ, hiệu ứng...)."""
-    d = job_dir(job_id)
-    p = studio["proc"]
-    if p and p.poll() is None and studio["job"] != job_id:
-        subprocess.run(f"taskkill /PID {p.pid} /T /F", shell=True, capture_output=True)
-        time.sleep(1)
-    if not (studio["proc"] and studio["proc"].poll() is None and studio["job"] == job_id):
-        log = open(d / "studio.log", "w", encoding="utf-8")
-        studio["proc"] = subprocess.Popen(
-            f'npx remotion studio src/index.ts --props="{d / "props.json"}" --port={STUDIO_PORT} --no-open',
-            cwd=REMOTION_DIR, shell=True, stdout=log, stderr=subprocess.STDOUT, creationflags=NO_WINDOW,
-        )
-        studio["job"] = job_id
-        (ROOT / ".studio.pid").write_text(str(studio["proc"].pid))
-        for _ in range(60):
-            if port_open(STUDIO_PORT):
-                break
-            time.sleep(0.5)
-    return {"url": f"http://localhost:{STUDIO_PORT}"}
 
 
 # ---------- Editor (timeline cắt ghép) ----------
@@ -417,6 +445,27 @@ def _resolve_src(src: str) -> str:
     return alt if (PUBLIC_DIR / alt).exists() else src
 
 
+def _logo_clip(lg: dict, w: int, h: int, dur: float) -> dict:
+    """Logo ở góc -> clip ảnh "vừa khung" thu nhỏ, đặt đúng góc như bản render."""
+    ar = 1.0
+    try:
+        from PIL import Image
+        with Image.open(PUBLIC_DIR / lg["src"]) as im:
+            ar = im.width / im.height
+    except Exception:  # svg / ảnh lỗi -> coi như vuông
+        pass
+    base, m = min(w, h), min(w, h) * lg.get("margin", 4) / 100
+    iw = base * lg.get("size", 14) / 100
+    ih = iw / ar
+    scale = iw / min(w, h * ar)  # ảnh "contain" trong khung full rồi scale
+    v, hz = (lg.get("position") or "top-right").split("-")
+    cx = m + iw / 2 if hz == "left" else w - m - iw / 2
+    cy = m + ih / 2 if v == "top" else h - m - ih / 2
+    return {"id": _uid(), "track": "t0", "type": "image", "src": lg["src"], "start": 0, "dur": dur, "name": "Logo",
+            "fit": "contain", "x": round(cx / w * 100, 2), "y": round(cy / h * 100, 2), "scale": round(scale, 4),
+            "opacity": lg.get("opacity", 1)}
+
+
 def timeline_from_props(p: dict) -> dict:
     """Chuyển kết quả AI (props.json) thành timeline để chỉnh tiếp như trình dựng video."""
     tl = blank_timeline(p["width"], p["height"])
@@ -433,7 +482,8 @@ def timeline_from_props(p: dict) -> dict:
         c = {"id": _uid(), "track": "v1", "type": "video", "start": s["start"], "dur": dur, "in": 0,
              "name": s.get("query") or Path(s["src"]).stem, "loop": True, "fit": "cover",
              "kenBurns": bool(p.get("kenBurns")), "dim": p.get("darken", 0), "volume": 0}
-        tr = {"fade": "fade", "slide": "slide-left", "wipe": "wipe-left"}.get(s.get("transition", "none"))
+        t0 = s.get("transition", "none")
+        tr = {"fade": "fade", "slide": "slide-left", "wipe": "wipe-left"}.get(t0) or             (t0 if t0 in {"dissolve-zoom", "blur-dissolve", "soft-push", "light-leak"} else None)
         if clips and tr and p.get("transitionSeconds"):
             c["transition"] = {"type": tr, "dur": p["transitionSeconds"]}
         if s.get("src"):
@@ -462,6 +512,11 @@ def timeline_from_props(p: dict) -> dict:
     if t.get("enabled") and t.get("text"):
         clips.append({"id": _uid(), "track": "t1", "type": "text", "start": t.get("start", 0),
                       "dur": t.get("duration", 3), "name": t["text"], "title": {**t, "start": 0}})
+    lg = p.get("logo") or {}
+    if lg.get("src") and (PUBLIC_DIR / lg["src"]).exists():
+        tl["tracks"].insert(0, {"id": "t0", "kind": "mixed", "name": "Logo"})
+        clips.append(_logo_clip(lg, p["width"], p["height"], dur))
+        media.append({"id": _uid(), "name": "Logo", "src": lg["src"], "type": "image"})
     tl["clips"], tl["media"] = clips, media
     if p.get("colorFilter"):
         tl["filter"] = p["colorFilter"]
@@ -499,6 +554,73 @@ def put_timeline(job_id: str, tl: dict):
         raise HTTPException(400, "timeline không hợp lệ")
     (d / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False), encoding="utf-8")
     return {"ok": True}
+
+
+AI_EDIT_PROMPT = """Bạn là trợ lý dựng video trong một trình biên tập timeline. Người dùng ra lệnh bằng lời,
+bạn trả về các THAO TÁC để sửa timeline. Chỉ trả về đúng 1 khối JSON, không giải thích ngoài JSON:
+{"reply": "<tóm tắt ngắn bằng tiếng Việt những gì đã làm>", "ops": [ ... ]}
+
+Các thao tác được phép:
+- {"op":"update","ids":["<clip id>",...],"set":{"<khoá>": <giá trị>, ...}}  // khoá có thể có dấu chấm, vd "subtitle.color", "transition.type"
+- {"op":"delete","ids":["<clip id>",...]}
+- {"op":"add","clip":{"track":"<track id>","type":"text","start":0,"dur":3,"name":"...","title":{"text":"...","fontSize":80,"color":"#ffffff"}}}
+- {"op":"timeline","set":{"filter":{"preset":"...","intensity":1,"brightness":0,"contrast":0,"saturation":0,"temperature":0,"vignette":0},"width":1080,"height":1920,"background":"#000000"}}
+
+Quy ước clip: start/dur tính bằng giây; video có volume (0-2), dim (0-1, làm tối), fit ("cover"/"contain"),
+scale, x, y (% vị trí, 50 = giữa), kenBurns (bool), speed, fadeIn/fadeOut (giây),
+transition {"type": "fade|dissolve-zoom|blur-dissolve|soft-push|light-leak|slide-left|slide-right|wipe-left|...", "dur": 0.5}.
+Câu lời (type "lyrics") có subtitle {mode: karaoke|preview|full, fontFamily, fontSize, color, highlightColor,
+strokeColor, strokeWidth, uppercase, position: bottom|center|top}. Không sửa nội dung chữ của câu lời.
+Khi đổi kiểu phụ đề, áp dụng cho MỌI clip lyrics. Chỉ dùng id có trong timeline. Không tự bịa file media mới.
+Nếu yêu cầu không làm được, trả "ops": [] và giải thích trong "reply".
+
+TIMELINE HIỆN TẠI (rút gọn):
+{timeline}
+
+ĐANG CHỌN: {selected}
+
+YÊU CẦU: {request}
+"""
+
+
+def _compact_timeline(tl: dict) -> dict:
+    clips = []
+    for c in tl.get("clips", []):
+        c = {k: v for k, v in c.items() if k not in ("lines", "words")}
+        if c.get("type") == "lyrics":  # mọi câu dùng chung kiểu -> chỉ gửi kiểu ở câu đầu cho gọn
+            if any(x.get("type") == "lyrics" for x in clips):
+                c.pop("subtitle", None)
+        clips.append(c)
+    return {"width": tl.get("width"), "height": tl.get("height"), "fps": tl.get("fps"),
+            "filter": tl.get("filter"), "tracks": tl.get("tracks"), "clips": clips,
+            "media": [{"name": m.get("name"), "type": m.get("type")} for m in tl.get("media", [])]}
+
+
+@app.post("/api/jobs/{job_id}/ai-edit")
+def ai_edit(job_id: str, body: dict):
+    from musicvideo import llm
+    job_dir(job_id)
+    req = (body.get("prompt") or "").strip()
+    tl = body.get("timeline")
+    if not req or not isinstance(tl, dict):
+        raise HTTPException(400, "Thiếu câu lệnh hoặc timeline")
+    if not llm.available():
+        raise HTTPException(400, "Chưa kết nối Claude CLI hay Codex CLI (vào Cài đặt > Kết nối)")
+    prompt = (AI_EDIT_PROMPT.replace("{timeline}", json.dumps(_compact_timeline(tl), ensure_ascii=False))
+              .replace("{selected}", json.dumps(body.get("selected") or [], ensure_ascii=False))
+              .replace("{request}", req))
+    try:
+        out = llm.ask(prompt, effort="low", timeout=300)
+    except Exception as e:
+        raise HTTPException(500, f"AI lỗi: {e}")
+    m = re.search(r"\{.*\}", out, re.S)
+    try:
+        res = json.loads(m.group(0)) if m else None
+    except json.JSONDecodeError:
+        res = None
+    if not isinstance(res, dict) or not isinstance(res.get("ops"), list):
+        raise HTTPException(500, "AI trả về không đúng định dạng: " + out.strip()[:200])
+    return {"reply": str(res.get("reply") or ""), "ops": res["ops"]}
 
 
 @app.post("/api/jobs/{job_id}/media")
@@ -591,6 +713,30 @@ def export_timeline(job_id: str, body: dict):
     meta.update(status="running", lastExport=out.name)
     write_meta(d, meta)
     return {"ok": True, "file": out.name}
+
+
+CLEANUP_GLOBS = ("audio16k.wav", "timeline.render.json", "export.rendering.*", "export.scaled.*", "*.before-*.json")
+LOG_KEEP = 200_000  # byte giữ lại ở cuối mỗi file log
+
+
+@app.post("/api/jobs/{job_id}/cleanup")
+def cleanup_job(job_id: str):
+    """Xoá file tạm không còn dùng sau khi xuất (giữ video, timeline, lời) và cắt bớt log dài."""
+    d = job_dir(job_id)
+    if status_of(job_id, d) == "running":
+        return {"freed": 0}
+    freed = 0
+    for pat in CLEANUP_GLOBS:
+        for f in d.glob(pat):
+            if f.is_file():
+                freed += f.stat().st_size
+                f.unlink(missing_ok=True)
+    for f in [*d.glob("*.log"), d / "log.txt"]:
+        if f.is_file() and f.stat().st_size > LOG_KEEP:
+            data = f.read_bytes()
+            freed += len(data) - LOG_KEEP
+            f.write_bytes(data[-LOG_KEEP:])
+    return {"freed": freed}
 
 
 def _last_export(job_id: str) -> Path:

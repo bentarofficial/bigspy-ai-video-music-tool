@@ -180,6 +180,19 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
 .colorf input[type=text]{border:0;background:transparent;padding:0;height:auto;font:12.5px "JetBrains Mono",monospace;text-transform:uppercase;box-shadow:none}
 .jmeta{display:block;font-size:10.5px;color:var(--dim);font-weight:400}
 .gohint{text-align:center;color:var(--dim);font-size:11.5px;margin-top:6px}
+.logobox{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.logolib{display:flex;flex-wrap:wrap;gap:8px}
+.lg{position:relative;width:64px;height:64px;border-radius:11px;border:1.5px solid var(--line2);cursor:pointer;display:grid;place-items:center;padding:6px;background:repeating-conic-gradient(#2a2a2e 0 25%,#1e1e22 0 50%) 0 0/12px 12px}
+.lg img{max-width:100%;max-height:100%}
+.lg:hover{border-color:rgba(255,255,255,.5)}
+.lg.on{border-color:#f2f2f2;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.lg.on::after{content:"✓";position:absolute;left:-6px;top:-6px;width:18px;height:18px;border-radius:50%;background:#f2f2f2;color:#111;font:700 11px/18px Inter,sans-serif;text-align:center}
+.lg .x{position:absolute;right:-6px;top:-6px;width:20px;height:20px;padding:0;border-radius:50%;background:#2a2a30;border:1px solid var(--line2);color:#ddd;font-size:12px;line-height:1;display:none;box-shadow:none}
+.lg:hover .x{display:grid;place-items:center}.lg .x:hover{background:#c0392b;color:#fff;filter:none}
+.lg.add{border-style:dashed;background:transparent;color:var(--mute);font-size:22px;flex-direction:column}
+.lg.add small{font-size:10px;margin-top:-2px}
+#logoOpts{margin-top:10px}
+.pvframe .pvlogo{position:absolute;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
 .pv{display:flex;flex-direction:column;align-items:center;gap:14px}
 .pvframe{position:relative;width:min(240px,60vw);border-radius:14px;overflow:hidden;border:1px solid var(--line2);background:linear-gradient(160deg,#2a3346,#3d2a3a 55%,#1c2230);box-shadow:0 20px 50px -20px rgba(0,0,0,.7);transition:aspect-ratio .25s}
 .pvframe .pvt{position:absolute;left:8%;right:8%;top:18%;text-align:center;font:800 18px/1.15 Inter,sans-serif;text-shadow:0 2px 10px rgba(0,0,0,.5);word-break:break-word}
@@ -299,6 +312,18 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
           <div><label>Cường độ bộ lọc <span id="fiLb" style="color:var(--dim)">80%</span></label><input type="range" name="filter_intensity" min="0" max="1" step="0.05" value="0.8" oninput="document.getElementById('fiLb').textContent=Math.round(this.value*100)+'%'"></div>
         </div>
         <div class="hint">Bộ lọc màu phủ đồng điệu lên mọi cảnh (các cảnh Pixabay quay bằng nhiều máy khác nhau). Vẫn chỉnh lại được trong Editor → tab Bộ lọc.</div>
+        <div class="logobox">
+          <label>Logo kênh <span style="color:var(--dim)">(không bắt buộc)</span></label>
+          <div class="logolib" id="logoLib"></div>
+          <input type="hidden" name="logo_name" id="logoName">
+          <input type="file" id="logoFile" accept="image/png,image/webp,image/jpeg,image/svg+xml" hidden>
+          <div class="hint" id="logoHint">Logo tải lên được lưu lại để dùng cho các video sau. Bấm vào logo để chọn / bỏ chọn.</div>
+          <div class="row" id="logoOpts" hidden>
+            <div><label>Vị trí</label><select name="logo_position"><option value="top-right">Góc trên phải</option><option value="top-left">Góc trên trái</option><option value="bottom-right">Góc dưới phải</option><option value="bottom-left">Góc dưới trái</option></select></div>
+            <div><label>Kích thước <span id="lsLb" style="color:var(--dim)">14%</span></label><input type="range" name="logo_size" min="5" max="35" step="1" value="14" oninput="document.getElementById('lsLb').textContent=this.value+'%'"></div>
+            <div><label>Độ đậm <span id="loLb" style="color:var(--dim)">90%</span></label><input type="range" name="logo_opacity" min="0.2" max="1" step="0.05" value="0.9" oninput="document.getElementById('loLb').textContent=Math.round(this.value*100)+'%'"></div>
+          </div>
+        </div>
       </div>
 
       <div class="step">
@@ -331,7 +356,6 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
     <div class="actions" style="padding:0 4px 2px">
       <a id="dl" download><button class="ghost" type="button">⬇ Tải video</button></a>
       <button class="ghost" id="openEditor" type="button">✂ Mở Editor</button>
-      <button class="ghost" id="studio">👁 Remotion Studio</button>
       <button class="ghost" id="stopJob" style="border-color:rgba(248,113,113,.4);color:var(--err)" hidden>■ Dừng</button>
     </div>
   </div>
@@ -342,9 +366,9 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
       <div><label>Số chữ hiện trước</label><input type="number" min="0" max="6" data-k="subtitle.lookahead"></div>
       <div><label>Hiện câu sớm (giây)</label><input type="number" step="0.1" min="0" max="3" data-k="subtitle.leadIn"></div>
       <div><label>Cỡ chữ</label><input type="number" data-k="subtitle.fontSize"></div>
-      <div><label>Màu chữ</label><input type="color" data-k="subtitle.color"></div>
-      <div><label>Màu khi hát</label><input type="color" data-k="subtitle.highlightColor"></div>
-      <div><label>Màu viền</label><input type="color" data-k="subtitle.strokeColor"></div>
+      <div><label>Màu chữ</label><div class="colorf"><input type="color" data-k="subtitle.color"><input type="text" maxlength="7" spellcheck="false"></div></div>
+      <div><label>Màu khi hát</label><div class="colorf"><input type="color" data-k="subtitle.highlightColor"><input type="text" maxlength="7" spellcheck="false"></div></div>
+      <div><label>Màu viền</label><div class="colorf"><input type="color" data-k="subtitle.strokeColor"><input type="text" maxlength="7" spellcheck="false"></div></div>
       <div><label>Độ dày viền</label><input type="number" min="0" max="16" data-k="subtitle.strokeWidth"></div>
       <div><label>Vị trí</label><select data-k="subtitle.position"><option value="bottom">Dưới</option><option value="center">Giữa</option><option value="top">Trên</option></select></div>
       <div><label>Font</label><select data-k="subtitle.fontFamily"><option value="Arial Black, Arial, sans-serif">Arial Black</option><option value="Arial, sans-serif">Arial</option><option value="Impact, sans-serif">Impact</option><option value="Georgia, serif">Georgia</option><option value="Times New Roman, serif">Times New Roman</option><option value="Segoe UI, sans-serif">Segoe UI</option><option value="Tahoma, sans-serif">Tahoma</option><option value="Verdana, sans-serif">Verdana</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option><option value="Palatino Linotype, serif">Palatino Linotype</option><option value="Courier New, monospace">Courier New</option><option value="Comic Sans MS, cursive">Comic Sans MS</option><option value="Be Vietnam Pro, sans-serif">Be Vietnam Pro</option><option value="Montserrat, sans-serif">Montserrat</option><option value="Roboto, sans-serif">Roboto</option><option value="Open Sans, sans-serif">Open Sans</option><option value="Nunito, sans-serif">Nunito</option><option value="Lexend, sans-serif">Lexend</option><option value="Josefin Sans, sans-serif">Josefin Sans</option><option value="Quicksand, sans-serif">Quicksand</option><option value="Comfortaa, cursive">Comfortaa</option><option value="Oswald, sans-serif">Oswald</option><option value="Anton, sans-serif">Anton</option><option value="Baloo 2, cursive">Baloo 2</option><option value="Playfair Display, serif">Playfair Display</option><option value="Merriweather, serif">Merriweather</option><option value="Noto Serif, serif">Noto Serif</option><option value="Lobster, cursive">Lobster</option><option value="Pacifico, cursive">Pacifico</option><option value="Dancing Script, cursive">Dancing Script</option><option value="Great Vibes, cursive">Great Vibes</option><option value="Charm, cursive">Charm</option><option value="Pattaya, sans-serif">Pattaya</option><option value="Patrick Hand, cursive">Patrick Hand</option><option value="Sigmar, cursive">Sigmar</option></select></div>
@@ -358,8 +382,8 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
       <div><label>Hiệu ứng</label><select data-k="title.animation"><option value="zoom">Zoom</option><option value="fade">Fade</option><option value="typewriter">Typewriter</option><option value="bounce">Bounce</option><option value="slide-up">Slide up</option><option value="glow">Glow</option></select></div>
       <div><label>Cỡ chữ</label><input type="number" data-k="title.fontSize"></div>
       <div><label>Vị trí dọc (%)</label><input type="number" min="0" max="100" data-k="title.y"></div>
-      <div><label>Màu chữ</label><input type="color" data-k="title.color"></div>
-      <div><label>Màu nhấn / glow</label><input type="color" data-k="title.accentColor"></div>
+      <div><label>Màu chữ</label><div class="colorf"><input type="color" data-k="title.color"><input type="text" maxlength="7" spellcheck="false"></div></div>
+      <div><label>Màu nhấn / glow</label><div class="colorf"><input type="color" data-k="title.accentColor"><input type="text" maxlength="7" spellcheck="false"></div></div>
       <div><label>Hiện trong (giây)</label><input type="number" step="0.5" min="0.5" data-k="title.duration"></div>
       <div><label>Font</label><select data-k="title.fontFamily"><option value="Arial Black, Arial, sans-serif">Arial Black</option><option value="Arial, sans-serif">Arial</option><option value="Impact, sans-serif">Impact</option><option value="Georgia, serif">Georgia</option><option value="Times New Roman, serif">Times New Roman</option><option value="Segoe UI, sans-serif">Segoe UI</option><option value="Tahoma, sans-serif">Tahoma</option><option value="Verdana, sans-serif">Verdana</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option><option value="Palatino Linotype, serif">Palatino Linotype</option><option value="Courier New, monospace">Courier New</option><option value="Comic Sans MS, cursive">Comic Sans MS</option><option value="Be Vietnam Pro, sans-serif">Be Vietnam Pro</option><option value="Montserrat, sans-serif">Montserrat</option><option value="Roboto, sans-serif">Roboto</option><option value="Open Sans, sans-serif">Open Sans</option><option value="Nunito, sans-serif">Nunito</option><option value="Lexend, sans-serif">Lexend</option><option value="Josefin Sans, sans-serif">Josefin Sans</option><option value="Quicksand, sans-serif">Quicksand</option><option value="Comfortaa, cursive">Comfortaa</option><option value="Oswald, sans-serif">Oswald</option><option value="Anton, sans-serif">Anton</option><option value="Baloo 2, cursive">Baloo 2</option><option value="Playfair Display, serif">Playfair Display</option><option value="Merriweather, serif">Merriweather</option><option value="Noto Serif, serif">Noto Serif</option><option value="Lobster, cursive">Lobster</option><option value="Pacifico, cursive">Pacifico</option><option value="Dancing Script, cursive">Dancing Script</option><option value="Great Vibes, cursive">Great Vibes</option><option value="Charm, cursive">Charm</option><option value="Pattaya, sans-serif">Pattaya</option><option value="Patrick Hand, cursive">Patrick Hand</option><option value="Sigmar, cursive">Sigmar</option></select></div>
     </div>
@@ -505,7 +529,7 @@ drop.ondrop = e => { e.preventDefault(); file.files = e.dataTransfer.files; file
 // nhớ mọi lựa chọn phong cách / AI & xử lý: lưu vào prefs.json trên máy (giữ qua cả khi tắt app),
 // chỉ đổi khi người dùng tự sửa
 const PREF_KEYS = ['orientation', 'subtitle_mode', 'title_animation', 'title_color', 'scene_length', 'theme',
-  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'lang', 'whisper_model', 'claude_model', 'claude_effort', 'separate', 'with_subs'];
+  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'lang', 'whisper_model', 'claude_model', 'claude_effort', 'separate', 'with_subs', 'logo_name', 'logo_position', 'logo_size', 'logo_opacity'];
 function readPrefs() {
   const o = {};
   for (const n of PREF_KEYS) { const el = $('#f')[n]; if (el) o[n] = el.type === 'checkbox' ? el.checked : el.value; }
@@ -526,6 +550,7 @@ async function loadPrefs() {
     else if (el.tagName !== 'SELECT' || [...el.options].some(o => o.value === String(v))) el.value = v;
   }
   $('#fiLb').textContent = Math.round($('#f').filter_intensity.value * 100) + '%';
+  $('#lsLb').textContent = $('#f').logo_size.value + '%'; $('#loLb').textContent = Math.round($('#f').logo_opacity.value * 100) + '%';
   syncSubs(); syncHex(); renderPreview();
   for (const n of PREF_KEYS) { const el = $('#f')[n]; if (el) el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', savePrefs); }
 }
@@ -533,10 +558,13 @@ async function loadPrefs() {
 function syncGo() { const ok = !!file.files[0]; $('#go').disabled = !ok; $('#goHint').hidden = ok; }
 // màu tên bài: ô màu + mã hex đồng bộ
 function syncHex() { document.querySelectorAll('.colorf').forEach(b => { b.querySelector('[type=text]').value = b.querySelector('[type=color]').value.toUpperCase(); }); }
-document.querySelectorAll('.colorf').forEach(b => {
+document.addEventListener('input', e => {  // bắt chung: cả ô màu trong bảng Tinh chỉnh (tạo sau khi chọn dự án)
+  const b = e.target.closest('.colorf'); if (!b) return;
   const c = b.querySelector('[type=color]'), t = b.querySelector('[type=text]');
-  c.addEventListener('input', () => { t.value = c.value.toUpperCase(); renderPreview(); });
-  t.addEventListener('input', () => { let v = t.value.trim(); if (!v.startsWith('#')) v = '#' + v; if (/^#[0-9a-f]{6}$/i.test(v)) { c.value = v.toLowerCase(); c.dispatchEvent(new Event('change', {bubbles: true})); renderPreview(); } });
+  if (e.target === c) t.value = c.value.toUpperCase();
+  else { let v = t.value.trim(); if (!v.startsWith('#')) v = '#' + v; if (!/^#[0-9a-f]{6}$/i.test(v)) return;
+    c.value = v.toLowerCase(); c.dispatchEvent(new Event('change', {bubbles: true})); }
+  renderPreview();
 });
 // xem trước khi chưa chọn dự án
 const RATIO = {portrait: '9/16', landscape: '16/9', square: '1/1'};
@@ -550,8 +578,52 @@ function renderPreview() {
   const t = box.querySelector('.pvt'); t.style.color = f.title_color.value;
   t.textContent = f.title.value || 'Tên bài hát';
   if (f.subtext.value) { const s = document.createElement('span'); s.className = 'pvs'; s.textContent = f.subtext.value; t.append(s); }
+  if (logoUrl) {
+    const fr = box.querySelector('.pvframe'), r = fr.getBoundingClientRect(), base = Math.min(r.width, r.height);
+    const im = new Image(); im.src = logoUrl; im.className = 'pvlogo'; const m = base * 0.04 + 'px';
+    const [v, h] = f.logo_position.value.split('-');
+    Object.assign(im.style, {width: base * f.logo_size.value / 100 + 'px', opacity: f.logo_opacity.value, [v]: m, [h]: m});
+    fr.append(im);
+  }
 }
 $('#f').addEventListener('input', renderPreview); $('#f').addEventListener('change', renderPreview);
+// ---- logo kênh: thư viện lưu trên máy (thư mục logos/), chọn 1 cái cho video ----
+var logoUrl = '';
+let logos = [];
+async function loadLogos(select) {
+  try { logos = await api('/api/logos'); } catch { logos = []; }
+  let cur = select ?? $('#logoName').value;
+  if (cur && !logos.some(l => l.name === cur)) cur = '';
+  pickLogo(cur);
+}
+function pickLogo(name) {
+  $('#logoName').value = name || '';
+  const l = logos.find(x => x.name === name); logoUrl = l ? l.url : '';
+  const lib = $('#logoLib'); lib.innerHTML = '';
+  for (const x of logos) {
+    const t = document.createElement('div'); t.className = 'lg' + (x.name === name ? ' on' : ''); t.title = x.name;
+    t.innerHTML = `<img src="${x.url}" alt=""><button type="button" class="x" title="Xoá logo này">✕</button>`;
+    t.onclick = e => {
+      if (e.target.closest('.x')) return delLogo(x.name);
+      pickLogo(x.name === $('#logoName').value ? '' : x.name); savePrefs();
+    };
+    lib.append(t);
+  }
+  const add = document.createElement('div'); add.className = 'lg add'; add.title = 'Tải logo mới (PNG nền trong suốt, tối đa 5 MB)';
+  add.innerHTML = '＋<small>Tải logo</small>'; add.onclick = () => $('#logoFile').click(); lib.append(add);
+  $('#logoOpts').hidden = !logoUrl;
+  renderPreview();
+}
+async function delLogo(name) {
+  if (!confirm(`Xoá logo "${name}" khỏi thư viện?`)) return;
+  try { await api('/api/logos/' + encodeURIComponent(name), {method: 'DELETE'}); } catch (e) { alert(e.message); }
+  loadLogos(); savePrefs();
+}
+$('#logoFile').onchange = async () => {
+  const fl = $('#logoFile').files[0]; $('#logoFile').value = ''; if (!fl) return;
+  const fd = new FormData(); fd.set('file', fl);
+  try { const r = await api('/api/logos', {method: 'POST', body: fd}); await loadLogos(r.name); savePrefs(); } catch (e) { alert(e.message); }
+};
 // bật/tắt phụ đề -> ẩn các tuỳ chọn chỉ dùng cho lời bài hát
 function syncSubs() {
   const on = $('#f').with_subs.checked;
@@ -560,7 +632,7 @@ function syncSubs() {
 }
 $('#f').with_subs.onchange = syncSubs;
 syncSubs(); syncGo(); renderPreview();
-loadPrefs();
+loadPrefs().then(() => loadLogos());
 
 // nút Cài đặt: mở/đóng bảng kết nối & phiên bản
 $('#setBtn').onclick = (e) => { e.stopPropagation(); const p = $('#setPop'); p.hidden = !p.hidden; $('#setBtn').classList.toggle('on', !p.hidden); };
@@ -690,6 +762,7 @@ function fillEditor() {
     const v = get(props, el.dataset.k);
     if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
   }
+  syncHex();
 }
 function readEditor() {
   const patch = {};
@@ -706,7 +779,6 @@ async function select(id) {
   $('#detail').innerHTML = ''; $('#detail').append($('#tpl').content.cloneNode(true));
   document.querySelectorAll('#detail .tab').forEach(t => t.onclick = () => { document.querySelectorAll('#detail .tab').forEach(x => x.classList.toggle('on', x === t)); document.querySelectorAll('#detail .pane').forEach(p => p.hidden = p.dataset.pane !== t.dataset.tab); });
   $('#openEditor').onclick = () => { location.href = `/editor?id=${id}`; };
-  $('#studio').onclick = async () => { $('#studio').disabled = true; $('#studio').textContent = 'Đang mở Studio…'; try { const r = await api(`/api/jobs/${id}/studio`, {method: 'POST'}); window.open(r.url, '_blank'); } catch (e) { alert(e.message); } $('#studio').disabled = false; $('#studio').textContent = '👁 Xem trước (Remotion Studio)'; };
   $('#stopJob').onclick = async () => { if (!confirm('Dừng dự án đang chạy?')) return; $('#stopJob').disabled = true; try { await api(`/api/jobs/${id}/stop`, {method: 'POST'}); } catch (e) { alert(e.message); } $('#stopJob').disabled = false; refresh(); };
   $('#saveRender').onclick = async () => { try { await api(`/api/jobs/${id}/props`, {method: 'PUT', headers: {'content-type': 'application/json'}, body: JSON.stringify(readEditor())}); await api(`/api/jobs/${id}/render`, {method: 'POST'}); refresh(); } catch (e) { alert(e.message); } };
   loadJobs(); refresh();

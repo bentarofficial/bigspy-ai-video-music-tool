@@ -98,9 +98,12 @@ def _finish(analysis: dict, lines: list[dict], clean: list[float]) -> list[dict]
         text = " ".join(w["text"] for ln in lines for w in ln["words"] if w["start"] < b and w["end"] > a)
         scenes.append({"start": round(a, 3), "end": round(b, 3), "lyrics": text})
 
-    # đoạn mạnh (điệp khúc) chuyển cảnh nhanh kiểu slide/wipe, đoạn nhẹ dùng fade
+    # Chuyển cảnh KẾT HỢP (cả 2 cảnh cùng chuyển động, ease-in-out) để không khựng ở điểm cắt.
+    # Đoạn nhẹ: hoà tan + zoom / nhoè / ánh sáng; đoạn mạnh (điệp khúc): đẩy mềm xen hoà tan + zoom.
+    soft = ["dissolve-zoom", "blur-dissolve", "dissolve-zoom", "light-leak"]
+    strong = ["soft-push", "dissolve-zoom", "soft-push", "blur-dissolve"]
     hi = np.percentile(energies, 70) if energies else 0
     for i, (sc, e) in enumerate(zip(scenes, energies)):
         sc["energy"] = round(e / (max(energies) or 1), 3)
-        sc["transition"] = "fade" if e < hi else ("slide" if i % 2 else "wipe")
+        sc["transition"] = (strong if e >= hi else soft)[i % 4]
     return scenes

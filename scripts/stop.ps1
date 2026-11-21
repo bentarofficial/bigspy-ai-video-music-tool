@@ -1,6 +1,6 @@
-# Dung server, Remotion Studio va moi tien trinh con (render, whisper...) cua AI Music Video Tool.
+# Dung server va moi tien trinh con (render, whisper...) cua AI Music Video Tool.
 $root = Split-Path -Parent $PSScriptRoot
-foreach ($f in '.server.pid', '.studio.pid') {
+foreach ($f in '.server.pid') {
     $path = Join-Path $root $f
     if (Test-Path $path) {
         $id = (Get-Content $path | Select-Object -First 1).Trim()

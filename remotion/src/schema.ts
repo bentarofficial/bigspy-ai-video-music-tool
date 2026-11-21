@@ -15,7 +15,7 @@ export const sceneSchema = z.object({
 	end: z.number(),
 	clipDuration: z.number(),
 	query: z.string(),
-	transition: z.enum(['fade', 'slide', 'wipe', 'none']),
+	transition: z.enum(['fade', 'slide', 'wipe', 'none', 'dissolve-zoom', 'blur-dissolve', 'soft-push', 'light-leak']),
 	credit: z.string().optional(),
 });
 
@@ -56,6 +56,17 @@ export const titleSchema = z.object({
 	y: z.number().min(0).max(100),
 });
 
+export const logoSchema = z.object({
+	/** đường dẫn trong remotion/public (ảnh PNG nền trong suốt) */
+	src: z.string(),
+	position: z.enum(['top-right', 'top-left', 'bottom-right', 'bottom-left']),
+	/** chiều rộng logo, % cạnh ngắn của khung hình */
+	size: z.number().min(3).max(50),
+	opacity: z.number().min(0).max(1),
+	/** khoảng cách tới mép, % cạnh ngắn */
+	margin: z.number().min(0).max(20),
+});
+
 export const videoSchema = z.object({
 	fps: z.number().int().min(1).max(60),
 	width: z.number().int(),
@@ -83,6 +94,7 @@ export const videoSchema = z.object({
 			fade: z.number().optional(),
 		})
 		.optional(),
+	logo: logoSchema.optional(),
 });
 
 export type VideoProps = z.infer<typeof videoSchema>;

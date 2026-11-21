@@ -77,6 +77,10 @@ def main() -> None:
     p.add_argument("--end", type=float, help="cắt nhạc: kết thúc ở giây thứ…")
     p.add_argument("--fade-in", type=float, default=0.5, help="fade-in khi cắt (giây)")
     p.add_argument("--fade-out", type=float, default=1.5, help="fade-out khi cắt (giây)")
+    p.add_argument("--logo", help="ảnh logo kênh (PNG nền trong suốt) hiện ở góc video")
+    p.add_argument("--logo-position", default="top-right", choices=["top-right", "top-left", "bottom-right", "bottom-left"])
+    p.add_argument("--logo-size", type=float, default=14, help="chiều rộng logo, %% cạnh ngắn khung hình")
+    p.add_argument("--logo-opacity", type=float, default=0.9)
     a = p.parse_args()
 
     if a.render_only:
@@ -182,7 +186,7 @@ def main() -> None:
     props = {
         "fps": a.fps, "width": w, "height": h, "duration": round(total, 3),
         "audio": song.relative_to(PUBLIC_DIR).as_posix(),
-        "transitionSeconds": 0.5, "kenBurns": True, "darken": 0.25,
+        "transitionSeconds": 0.8, "kenBurns": True, "darken": 0.25,
         "scenes": out_scenes,
         "lines": lines,
         "subtitle": {
@@ -199,6 +203,13 @@ def main() -> None:
             "color": a.title_color, "accentColor": "#ff4fa3", "animation": a.title_animation, "animOut": a.title_out, "y": 42,
         },
     }
+    if a.logo and Path(a.logo).is_file():
+        logo = pub_dir / f"logo{Path(a.logo).suffix.lower()}"
+        if Path(a.logo).resolve() != logo.resolve():
+            shutil.copyfile(a.logo, logo)
+        props["logo"] = {"src": logo.relative_to(PUBLIC_DIR).as_posix(), "position": a.logo_position,
+                         "size": max(3.0, min(50.0, a.logo_size)), "opacity": max(0.0, min(1.0, a.logo_opacity)),
+                         "margin": 4}
     if a.color_filter and a.color_filter != "none":
         props["colorFilter"] = {"preset": a.color_filter, "intensity": max(0.0, min(1.0, a.filter_intensity))}
     props_path = out_dir / "props.json"

@@ -45,7 +45,6 @@ Log của server nằm trong `logs\`, log từng video nằm trong `output\<job>
   - Cả câu + câu sau: hiện trước cả câu đang hát và câu kế tiếp (mờ hơn).
 - **Tên bài hát**: chỉnh chữ, cỡ chữ, màu, màu nhấn, vị trí, thời gian hiện. Hiệu ứng có `zoom`, `fade`, `typewriter`, `bounce`, `slide-up`, `glow`.
 - **Lưu & render lại**: đổi style mà không phải nhận lời hay tải clip lại.
-- **Xem trước (Remotion Studio)**: xem từng khung hình và tua video trước khi render.
 
 ## Dùng bằng dòng lệnh
 

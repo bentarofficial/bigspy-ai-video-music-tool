@@ -11,7 +11,7 @@ REPO = "bentarofficial/bigspy-ai-video-music-tool"
 ASSET = "app-update.zip"
 ROOT = Path(__file__).resolve().parent.parent
 # Dữ liệu của người dùng: không bao giờ bị ghi đè hay xóa khi cập nhật.
-KEEP = {".env", ".cache", "output", "uploads", "logs", ".git", ".deps.hash", ".server.pid", ".studio.pid",
+KEEP = {".env", ".cache", "output", "uploads", "logos", "logs", ".git", ".deps.hash", ".server.pid", ".studio.pid",
         "remotion/node_modules", "remotion/public/clips", "remotion/public/jobs"}
 
 

@@ -34,7 +34,7 @@ export type TextStyle = TitleProps & {
 	bgRadius?: number;
 };
 
-export const TRANSITIONS = ['none', 'fade', 'fadeblack', 'fadewhite', 'flash', 'slide-left', 'slide-right', 'slide-up', 'slide-down',
+export const TRANSITIONS = ['none', 'dissolve-zoom', 'blur-dissolve', 'soft-push', 'light-leak', 'fade', 'fadeblack', 'fadewhite', 'flash', 'slide-left', 'slide-right', 'slide-up', 'slide-down',
 	'wipe-left', 'wipe-right', 'wipe-up', 'wipe-down', 'circle', 'zoom-in', 'zoom-out', 'blur', 'spin',
 	'whip-left', 'whip-right', 'zoom-blur', 'glitch', 'flip', 'cube-left', 'diamond', 'split', 'diag', 'burn', 'shake'] as const;
 export type Transition = {type: (typeof TRANSITIONS)[number]; dur: number};

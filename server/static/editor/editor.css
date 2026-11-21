@@ -236,3 +236,15 @@ input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px}
 .tabs button,.rtabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px 5px;min-width:0}
 .tabs button svg,.rtabs button svg{width:18px;height:18px;flex:none}
 .tabs button span,.rtabs button span{font-size:10.5px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+
+.ailog{display:flex;flex-direction:column;gap:6px;max-height:42vh;overflow:auto;margin-bottom:8px}
+.aimsg{padding:7px 10px;border-radius:10px;font-size:12.5px;line-height:1.45;white-space:pre-wrap;max-width:92%}
+.aimsg.me{align-self:flex-end;background:rgba(96,165,250,.18)}
+.aimsg.ai{align-self:flex-start;background:rgba(255,255,255,.06)}
+.aimsg.wait{opacity:.6}.aimsg.err{color:#fca5a5}
+.aiex{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.aiex .ghost{font-size:11px;padding:4px 8px;text-align:left}
+#aiIn{width:100%;box-sizing:border-box;resize:vertical;margin-bottom:6px}
+#aiSend:disabled{opacity:.6}
+.cliptip{position:fixed;z-index:9999;pointer-events:none;max-width:420px;background:#111827;border:1px solid var(--line2);border-radius:8px;padding:6px 10px;box-shadow:0 6px 20px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px}
+.cliptip b{font-size:13px;font-weight:600;white-space:normal;line-height:1.4}
+.cliptip small{color:var(--dim);font-size:11px}

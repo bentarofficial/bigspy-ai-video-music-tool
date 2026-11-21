@@ -2,6 +2,7 @@
 .cache/
 output/
 uploads/
+logos/
 logs/
 *.pid
 remotion/node_modules/
