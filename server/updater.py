@@ -2,6 +2,7 @@
 import json
 import shutil
 import subprocess
+import time
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -29,7 +30,21 @@ def _get(url: str, timeout: int = 15):
     return urllib.request.urlopen(req, timeout=timeout)
 
 
+_cache: dict = {}
+
+
 def check() -> dict:
+    """Kết quả được nhớ 5 phút để không chạm giới hạn 60 lượt/giờ của GitHub API."""
+    hit = _cache.get("v")
+    if hit and time.time() - hit[0] < 300 and hit[1].get("current") == current_version():
+        return hit[1]
+    info = _check()
+    if info.get("latest"):
+        _cache["v"] = (time.time(), info)
+    return info
+
+
+def _check() -> dict:
     cur = current_version()
     try:
         with _get(f"https://api.github.com/repos/{REPO}/releases/latest") as r:
@@ -48,7 +63,7 @@ def _kept(rel: str) -> bool:
 
 
 def apply() -> dict:
-    info = check()
+    info = _check()
     if not info["available"]:
         return {"ok": False, "message": "Đang dùng bản mới nhất.", **info}
     stage = ROOT / ".cache" / "update"
