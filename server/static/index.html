@@ -142,6 +142,9 @@ button:disabled{opacity:.45;cursor:default;filter:none}
 .drop span{color:var(--mute);font-size:12px}
 .drop>div:last-child{min-width:0}
 #cutter{margin-top:14px}
+#waveBar{position:relative;height:10px;margin:6px 2px 0;border-radius:6px;background:rgba(255,255,255,.04);cursor:pointer;touch-action:none}
+#waveBar i{position:absolute;top:1px;bottom:1px;border-radius:5px;background:rgba(255,255,255,.22);cursor:grab}
+#waveBar i:hover,#waveBar.drag i{background:rgba(255,255,255,.38)}#waveBar.drag i{cursor:grabbing}
 #wave{width:100%;height:90px;background:var(--field);border:1px solid var(--line2);border-radius:12px;cursor:crosshair;touch-action:none;display:block}
 
 /* ---------- detail ---------- */
@@ -258,11 +261,13 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
         <div class="drop" id="drop"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg></div><div><b id="dropTitle">Kéo thả hoặc bấm để chọn file nhạc</b><span id="dropSub">mp3, wav, m4a, flac</span></div></div>
         <input type="file" id="file" name="audio" accept="audio/*" hidden>
         <div id="cutter" hidden>
-          <label>✂ Cắt nhạc — kéo trên sóng âm để chọn đoạn (bỏ trống = cả bài)</label>
+          <label>✂ Cắt nhạc — kéo trên sóng âm để chọn đoạn, lăn chuột để phóng to (bỏ trống = cả bài)</label>
           <canvas id="wave" height="90"></canvas>
-          <div class="row" style="margin-top:2px">
+          <div id="waveBar" hidden title="Kéo để xem sang trái / phải"><i></i></div>
+          <div class="row" style="margin-top:2px;grid-template-columns:1fr 1fr 1fr">
             <div><label>Bắt đầu (giây)</label><input type="number" step="0.1" min="0" name="start" id="cutStart"></div>
             <div><label>Kết thúc (giây)</label><input type="number" step="0.1" min="0" name="end" id="cutEnd"></div>
+            <div><label>Độ dài (giây)</label><input type="number" step="0.1" min="0.5" id="cutDur" placeholder="cả bài" title="Gõ độ dài để đổi điểm kết thúc"></div>
           </div>
           <div class="actions">
             <select id="cutLen"><option value="15">15s</option><option value="30" selected>30s</option><option value="45">45s</option><option value="60">60s</option></select>
@@ -405,6 +410,7 @@ file.onchange = () => { if (file.files[0]) { $('#dropTitle').textContent = file.
 // ---- cắt nhạc: sóng âm + chọn đoạn + gợi ý đoạn hay nhất ----
 const wave = $('#wave'), cs = $('#cutStart'), ce = $('#cutEnd');
 let buf = null, peaks = null, rms = null, player = null, ctx = null;
+let v0 = 0, v1 = 0; // khung đang xem (giây) – lăn chuột để phóng to / thu nhỏ quanh con trỏ
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 async function loadWave(f) {
@@ -421,36 +427,62 @@ async function loadWave(f) {
   rms = []; for (let i = 0; i + hop <= d.length; i += hop) { let s = 0; for (let j = i; j < i + hop; j += 8) s += d[j] * d[j]; rms.push(Math.sqrt(s / (hop / 8))); }
   $('#dropSub').textContent = `${fmt(buf.duration)} · ${(f.size/1048576).toFixed(1)} MB · bấm để đổi file`;
   $('#cutInfo').textContent = `Bài dài ${fmt(buf.duration)}. Kéo trên sóng âm để chọn đoạn, hoặc bấm Gợi ý.`;
-  drawWave();
+  v0 = 0; v1 = buf.duration; drawWave();
 }
 
 function drawWave() {
   const W = wave.width = wave.clientWidth * devicePixelRatio, H = wave.height = 90 * devicePixelRatio, g = wave.getContext('2d');
   g.clearRect(0, 0, W, H);
-  if (!peaks || !buf) return;
-  const s = +cs.value || 0, e = +ce.value || 0, dur = buf.duration;
-  if (e > s) { g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(s / dur * W, 0, (e - s) / dur * W, H); }
-  peaks.forEach((p, i) => {
-    const x = i / peaks.length * W, t = i / peaks.length * dur;
+  if (!peaks || !buf) { $('#waveBar').hidden = true; return; }
+  const s = +cs.value || 0, e = +ce.value || 0, span = v1 - v0, X = (t) => (t - v0) / span * W;
+  if (e > s) { g.fillStyle = 'rgba(255,255,255,.22)'; g.fillRect(X(s), 0, X(e) - X(s), H); }
+  // đỉnh sóng tính lại theo khung đang xem -> phóng to vẫn rõ nét
+  const d = buf.getChannelData(0), sr = buf.sampleRate, cols = Math.min(600, Math.floor(W / (2 * devicePixelRatio))), cw = W / cols;
+  for (let i = 0; i < cols; i++) {
+    const t = v0 + (i + 0.5) / cols * span, a = Math.floor((v0 + i / cols * span) * sr), b = Math.floor((v0 + (i + 1) / cols * span) * sr);
+    let m = 0; for (let j = a, st = Math.max(1, (b - a) >> 6); j < b; j += st) m = Math.max(m, Math.abs(d[j] || 0));
     g.fillStyle = e > s && t >= s && t <= e ? '#e6e6e9' : '#3a3a40';
-    const h = Math.max(1, p * H * 0.95); g.fillRect(x, (H - h) / 2, Math.max(1, W / peaks.length - 1), h);
-  });
+    const h = Math.max(1, m * H * 0.95); g.fillRect(i * cw, (H - h) / 2, Math.max(1, cw - 1), h);
+  }
   if (e > s) {
     // tay nắm ở 2 đầu đoạn chọn
     for (const t of [s, e]) {
-      const x = t / dur * W, hw = 3 * devicePixelRatio, hh = 22 * devicePixelRatio;
+      const x = X(t), hw = 3 * devicePixelRatio, hh = 22 * devicePixelRatio;
       g.fillStyle = '#d4d4d8'; g.fillRect(x - hw / 2, 0, hw, H);
       g.beginPath(); g.roundRect(x - hw * 1.5, (H - hh) / 2, hw * 3, hh, hw); g.fill();
     }
   }
-  if (player?.pos != null) { g.fillStyle = '#fff'; g.fillRect(player.pos / dur * W, 0, 2, H); }
+  if (player?.pos != null) { g.fillStyle = '#fff'; g.fillRect(X(player.pos), 0, 2, H); }
+  const bar = $('#waveBar'), zoomed = span < buf.duration - 0.01;
+  bar.hidden = !zoomed;
+  if (zoomed) { const th = bar.firstElementChild; th.style.left = v0 / buf.duration * 100 + '%'; th.style.width = Math.max(4, span / buf.duration * 100) + '%'; }
+  if (zoomed) { // đang phóng to: ghi mức phóng + khoảng đang xem
+    g.font = `${11 * devicePixelRatio}px system-ui`; g.fillStyle = 'rgba(255,255,255,.7)'; g.textBaseline = 'top';
+    g.fillText(`×${(buf.duration / span).toFixed(1)}  ${v0.toFixed(1)}s – ${v1.toFixed(1)}s`, 6 * devicePixelRatio, 4 * devicePixelRatio);
+  }
 }
 
 // Kéo chuột: vùng trống = chọn đoạn mới | sát 2 đầu = kéo giãn đầu đó | bên trong đoạn = dời cả đoạn
 let drag = null;
 const EDGE = 8; // px: khoảng "bắt" đầu mút
-const tAt = ev => { const r = wave.getBoundingClientRect(); return Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * (buf?.duration || 0); };
-const xOf = t => t / buf.duration * wave.getBoundingClientRect().width;
+const tAt = ev => { const r = wave.getBoundingClientRect(); return v0 + Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * (v1 - v0); };
+const xOf = t => (t - v0) / (v1 - v0) * wave.getBoundingClientRect().width;
+// lăn lên = phóng to quanh con trỏ, lăn xuống = thu nhỏ (tối đa về cả bài); Shift + lăn / lăn ngang = dời khung
+wave.addEventListener('wheel', ev => {
+  if (!buf) return;
+  ev.preventDefault();
+  const dur = buf.duration, span = v1 - v0;
+  if (ev.shiftKey || Math.abs(ev.deltaX) > Math.abs(ev.deltaY)) {
+    const dx = (ev.shiftKey ? ev.deltaY : ev.deltaX) / wave.clientWidth * span;
+    const n0 = Math.max(0, Math.min(dur - span, v0 + dx)); v0 = n0; v1 = n0 + span;
+  } else {
+    const t = tAt(ev), k = ev.deltaY < 0 ? 0.8 : 1.25, ns = Math.max(Math.min(2, dur), Math.min(dur, span * k));
+    const f = (t - v0) / span; let n0 = t - f * ns;
+    n0 = Math.max(0, Math.min(dur - ns, n0)); v0 = n0; v1 = ns >= dur ? dur : n0 + ns;
+    if (ns >= dur) v0 = 0;
+  }
+  drawWave(); wave.style.cursor = CURSOR[hitTest(ev)];
+}, {passive: false});
 function hitTest(ev) {
   const s = +cs.value, e = +ce.value; if (!(e > s)) return 'new';
   const x = ev.clientX - wave.getBoundingClientRect().left;
@@ -459,6 +491,19 @@ function hitTest(ev) {
   if (x > xOf(s) && x < xOf(e)) return 'move';
   return 'new';
 }
+// thanh trượt dưới sóng âm: kéo nút để dời khung đang xem, bấm vào rãnh để nhảy tới đó
+(() => {
+  const bar = $('#waveBar'); let grab = null;
+  const panTo = (n0) => { const span = v1 - v0; v0 = Math.max(0, Math.min(buf.duration - span, n0)); v1 = v0 + span; drawWave(); };
+  bar.onpointerdown = ev => {
+    if (!buf) return; ev.preventDefault();
+    const r = bar.getBoundingClientRect(), t = (ev.clientX - r.left) / r.width * buf.duration;
+    if (ev.target === bar) panTo(t - (v1 - v0) / 2); // bấm rãnh -> căn giữa khung vào chỗ bấm
+    grab = {x: ev.clientX, v0}; bar.classList.add('drag'); bar.setPointerCapture(ev.pointerId);
+  };
+  bar.onpointermove = ev => { if (!grab) return; const r = bar.getBoundingClientRect(); panTo(grab.v0 + (ev.clientX - grab.x) / r.width * buf.duration); };
+  bar.onpointerup = bar.onpointercancel = () => { grab = null; bar.classList.remove('drag'); };
+})();
 const CURSOR = {start: 'ew-resize', end: 'ew-resize', move: 'grab', new: 'crosshair'};
 wave.onpointerdown = ev => {
   if (!buf || ev.button !== 0) return; // chỉ chuột trái
@@ -493,7 +538,8 @@ wave.onpointercancel = wave.onlostpointercapture = () => endDrag();
 addEventListener('pointerup', () => { if (drag) { endDrag(); updateCut(); } });
 addEventListener('blur', endDrag);
 cs.oninput = ce.oninput = () => updateCut();
-function updateCut() { const s = +cs.value, e = +ce.value; $('#cutInfo').textContent = e > s ? `Đoạn chọn: ${fmt(s)} → ${fmt(e)} (${(e - s).toFixed(1)}s)` : (buf ? `Dùng cả bài (${fmt(buf.duration)})` : ''); drawWave(); }
+$('#cutDur').oninput = () => { const L = +$('#cutDur').value; if (!(L > 0)) return; const s = +cs.value || 0, mx = buf ? buf.duration : Infinity; if (!cs.value) cs.value = '0'; ce.value = Math.min(mx, s + L).toFixed(1); updateCut(true); };
+function updateCut(fromDur) { const s = +cs.value, e = +ce.value; if (fromDur !== true && document.activeElement !== $('#cutDur')) $('#cutDur').value = e > s ? (e - s).toFixed(1) : ''; $('#cutInfo').textContent = e > s ? `Đoạn chọn: ${fmt(s)} → ${fmt(e)} (${(e - s).toFixed(1)}s)` : (buf ? `Dùng cả bài (${fmt(buf.duration)})` : ''); drawWave(); }
 
 $('#suggest').onclick = () => {
   if (!rms) return;
