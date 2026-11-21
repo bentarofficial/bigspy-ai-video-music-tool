@@ -33,8 +33,7 @@ Tùy chọn tách giọng hát để nhận lời chuẩn hơn: `pip install dem
 
 ## Chạy
 
-- **`start.bat`**: khởi động server **ẩn** (PowerShell `-WindowStyle Hidden`) rồi mở http://127.0.0.1:8790
-- **`stop.bat`**: dừng server, Remotion Studio và các tiến trình render đang chạy
+- Tải file `.exe` mới nhất từ mục **Releases** trên GitHub rồi chạy; ứng dụng mở http://127.0.0.1:8790
 
 Log của server nằm trong `logs\`, log từng video nằm trong `output\<job>\log.txt`.
 

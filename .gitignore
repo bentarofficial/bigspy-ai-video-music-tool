@@ -17,3 +17,5 @@ build/
 *.spec
 prefs.json
 exports/
+start.bat
+stop.bat

@@ -57,7 +57,7 @@ export function applyIn(fx: Fx, name: string, f: number, n: number, fps: number,
 /** Áp hiệu ứng RA. r: số khung còn lại tới lúc biến mất hẳn (0 = đã biến mất). */
 export function applyOut(fx: Fx, name: string, r: number, n: number, D: number): Fx {
 	n = Math.max(1, n);
-	const q = interpolate(r, [n, 0], [0, 1], clamp);
+	const q = interpolate(r, [0, n], [1, 0], clamp);
 	switch (name) {
 		case 'fade': fx.opacity *= 1 - q; break;
 		case 'zoom-out': fx.opacity *= 1 - q; fx.sc *= 1 - q * 0.7; break;
