@@ -1,4 +1,4 @@
-# Khởi động server ẩn rồi mở giao diện trong cửa sổ ứng dụng riêng (Edge/Chrome --app).
+﻿# Khởi động server ẩn rồi mở giao diện trong cửa sổ ứng dụng riêng (Edge/Chrome --app).
 # Đóng cửa sổ -> dừng server (nếu chính lần chạy này khởi động server).
 # -Browser: mở tab trình duyệt thường (dùng cho start.bat khi chạy từ mã nguồn).
 # -NoWindow: chỉ chạy server (dùng khi tự cập nhật, cửa sổ cũ tự tải lại).
@@ -31,7 +31,8 @@ if (-not $running) {
     }
 }
 if ($NoWindow) { exit }
-$browser = @(
+# Lưu ý: PowerShell không phân biệt hoa/thường -> không đặt tên trùng tham số $Browser.
+$appExe = @(
     "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
     "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
     "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
@@ -39,11 +40,11 @@ $browser = @(
     "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
-if ($Browser -or -not $browser) { Start-Process $url; exit }
+if ($Browser -or -not $appExe) { Start-Process $url; exit }
 
 # Hồ sơ riêng: cửa sổ không lẫn với trình duyệt thường, và tiến trình sống đến khi đóng cửa sổ.
 $profileDir = Join-Path $env:LOCALAPPDATA 'AIMusicVideo\window'
-$app = Start-Process -FilePath $browser -PassThru -ArgumentList @(
+$app = Start-Process -FilePath $appExe -PassThru -ArgumentList @(
     "--app=$url", "--user-data-dir=`"$profileDir`"", '--no-first-run',
     '--no-default-browser-check', '--window-size=1500,920',
     '--force-dark-mode'  # thanh tiêu đề tối, khớp màu giao diện
