@@ -845,7 +845,6 @@ def cleanup_job(job_id: str):
 def _last_export(job_id: str) -> Path:
     name = read_meta(job_dir(job_id)).get("lastExport")
     f = EXPORTS / name if name else None
-    shutil.rmtree(d / "render-public", ignore_errors=True)
     if not f or not f.exists():
         raise HTTPException(404, "Chưa có file xuất")
     return f
