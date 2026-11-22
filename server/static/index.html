@@ -938,8 +938,10 @@ addEventListener('keydown', e => {
   $('updBtn').onclick=async()=>{
     if(!confirm('Tải và cài bản mới? Tool sẽ tự khởi động lại.'))return;
     $('updBtn').disabled=true;$('updBtn').textContent='Đang tải…';
-    const r=await fetch('/api/update',{method:'POST'});const j=await r.json();
-    if(!r.ok){alert(j.detail||'Lỗi cập nhật');$('updBtn').disabled=false;$('updBtn').textContent='Cập nhật ngay';return;}
+    let r,j;
+    try{r=await fetch('/api/update',{method:'POST'});j=await r.json().catch(()=>({detail:'Lỗi máy chủ ('+r.status+'), xem logs\server.err.log'}));}
+    catch(e){r={ok:false};j={detail:e.message};}
+    if(!r.ok){alert('Cập nhật lỗi: '+(j.detail||''));$('updBtn').disabled=false;$('updBtn').textContent='Cập nhật ngay';return;}
     $('updBtn').textContent=j.message;
     if(j.ok){const wait=async()=>{try{await fetch('/api/health');location.reload()}catch(e){setTimeout(wait,2000)}};setTimeout(wait,6000);}
   };

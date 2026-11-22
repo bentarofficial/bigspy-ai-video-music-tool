@@ -25,6 +25,13 @@ ENV_FILE = ROOT / ".env"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # không bật cửa sổ console trên Windows
 
 app = FastAPI(title="AI Music Video Tool")
+
+
+@app.on_event("startup")
+def _cleanup_update_leftovers():
+    from server import updater
+    updater.cleanup_old()
+
 STATIC = Path(__file__).parent / "static"
 PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=PUBLIC_DIR), name="media")
@@ -126,7 +133,10 @@ def update_apply():
     from server import updater
     if any(p.poll() is None for p in procs.values()):
         raise HTTPException(409, "Đang có video chạy — đợi xong hoặc dừng rồi hãy cập nhật.")
-    return updater.apply()
+    try:
+        return updater.apply()
+    except Exception as e:
+        raise HTTPException(500, f"Cập nhật lỗi: {e}")
 
 
 @app.get("/api/settings")

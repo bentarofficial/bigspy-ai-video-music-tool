@@ -1,7 +1,8 @@
 # Khởi động server ẩn rồi mở giao diện trong cửa sổ ứng dụng riêng (Edge/Chrome --app).
 # Đóng cửa sổ -> dừng server (nếu chính lần chạy này khởi động server).
 # -Browser: mở tab trình duyệt thường (dùng cho start.bat khi chạy từ mã nguồn).
-param([switch]$Browser)
+# -NoWindow: chỉ chạy server (dùng khi tự cập nhật, cửa sổ cũ tự tải lại).
+param([switch]$Browser, [switch]$NoWindow)
 $ErrorActionPreference = 'SilentlyContinue'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -29,6 +30,7 @@ if (-not $running) {
         catch { Start-Sleep -Milliseconds 500 }
     }
 }
+if ($NoWindow) { exit }
 $browser = @(
     "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
     "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
@@ -47,6 +49,8 @@ $app = Start-Process -FilePath $browser -PassThru -ArgumentList @(
     '--force-dark-mode'  # thanh tiêu đề tối, khớp màu giao diện
 )
 if (-not $running) {
+    $t0 = Get-Date
     $app.WaitForExit()
-    & (Join-Path $PSScriptRoot 'stop.ps1') | Out-Null
+    # Thoát ngay = Edge chuyển cửa sổ cho tiến trình đang mở sẵn -> không phải người dùng đóng app.
+    if (((Get-Date) - $t0).TotalSeconds -gt 5) { & (Join-Path $PSScriptRoot 'stop.ps1') | Out-Null }
 }

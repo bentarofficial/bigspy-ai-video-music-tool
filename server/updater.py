@@ -62,6 +62,28 @@ def _kept(rel: str) -> bool:
     return any(rel == k or rel.startswith(k + "/") for k in KEEP)
 
 
+def _write(z: zipfile.ZipFile, m: zipfile.ZipInfo, dst: Path) -> None:
+    try:
+        out = open(dst, "wb")
+    except PermissionError:
+        # File đang chạy (vd. "AI Music Video.exe"): Windows không cho ghi đè nhưng cho đổi tên.
+        old = dst.with_name(dst.name + ".old")
+        old.unlink(missing_ok=True)
+        dst.rename(old)
+        out = open(dst, "wb")
+    with z.open(m) as src, out:
+        shutil.copyfileobj(src, out)
+
+
+def cleanup_old() -> None:
+    """Xoá các file .old còn sót từ lần cập nhật trước (lúc đó đang bị khoá)."""
+    for f in ROOT.glob("*.old"):
+        try:
+            f.unlink()
+        except OSError:
+            pass
+
+
 def apply() -> dict:
     info = _check()
     if not info["available"]:
@@ -79,8 +101,7 @@ def apply() -> dict:
                 continue
             dst = ROOT / rel
             dst.parent.mkdir(parents=True, exist_ok=True)
-            with z.open(m) as src, open(dst, "wb") as out:
-                shutil.copyfileobj(src, out)
+            _write(z, m, dst)
     # Khởi động lại qua `start` để tiến trình mới không nằm trong cây tiến trình của server (stop.ps1 kill cả cây).
     subprocess.Popen(f'cmd /c start "" /min powershell -NoProfile -ExecutionPolicy Bypass -File '
                      f'"{ROOT / "scripts" / "restart.ps1"}"', shell=True, cwd=ROOT)
