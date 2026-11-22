@@ -33,7 +33,7 @@ Tùy chọn tách giọng hát để nhận lời chuẩn hơn: `pip install dem
 
 ## Chạy
 
-- Tải file `.exe` mới nhất từ mục **Releases** trên GitHub rồi chạy; ứng dụng mở http://127.0.0.1:8790
+- Tải file `.exe` mới nhất từ mục **Releases** trên GitHub rồi chạy; ứng dụng mở trong cửa sổ riêng
 
 Log của server nằm trong `logs\`, log từng video nằm trong `output\<job>\log.txt`.
 

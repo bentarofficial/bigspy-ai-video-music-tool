@@ -1,5 +1,7 @@
 # Khởi động server ẩn rồi mở giao diện trong cửa sổ ứng dụng riêng (Edge/Chrome --app).
 # Đóng cửa sổ -> dừng server (nếu chính lần chạy này khởi động server).
+# -Browser: mở tab trình duyệt thường (dùng cho start.bat khi chạy từ mã nguồn).
+param([switch]$Browser)
 $ErrorActionPreference = 'SilentlyContinue'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -35,7 +37,7 @@ $browser = @(
     "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
-if (-not $browser) { Start-Process $url; exit }
+if ($Browser -or -not $browser) { Start-Process $url; exit }
 
 # Hồ sơ riêng: cửa sổ không lẫn với trình duyệt thường, và tiến trình sống đến khi đóng cửa sổ.
 $profileDir = Join-Path $env:LOCALAPPDATA 'AIMusicVideo\window'
