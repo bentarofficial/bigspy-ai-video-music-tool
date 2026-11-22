@@ -57,10 +57,23 @@ def lrclib_candidates(title: str, artist: str = "") -> list[dict]:
     return out
 
 
+def _ask_lyrics(prompt: str, model: str) -> dict:
+    out = llm.ask(prompt, model or os.environ.get("MV_CLAUDE_MODEL") or "claude-sonnet-5-5",
+                  web=True, timeout=420)
+    return json.loads(re.search(r"\{.*\}", out, re.S).group(0))
+
+
+_REPLY = """Reply with ONLY this JSON, nothing else:
+{{"title": "...", "artist": "...", "url": "...", "lyrics": "full lyrics, one line per line"}}
+If you cannot find it, reply {{"lyrics": ""}}."""
+
+
 def claude_search(heard: str, title: str, artist: str, model: str = "") -> list[dict]:
+    """Lần 1: tìm theo câu Whisper nghe được. Lần 2 (nếu trống): tìm theo tên bài + "lời bài hát"
+    trên các trang lời tiếng Việt, rồi chọn bản có nội dung gần với câu nghe được nhất."""
     if not llm.available():
         return []
-    prompt = f"""Find the official lyrics of the song that contains these lines (transcribed by speech
+    by_lines = f"""Find the official lyrics of the song that contains these lines (transcribed by speech
 recognition, so some words are WRONG — they sound similar to the real words):
 
 \"\"\"{heard[:1500]}\"\"\"
@@ -69,21 +82,31 @@ Hint — title given by the user: {title or "unknown"} (may be a different song 
 or contain extra words like "chill/remix"). Artist hint: {artist or "unknown"}.
 
 Search the web (Google, lyric sites, music platforms) using distinctive phrases from the lines above.
-Make sure the lyrics you return really contain these lines. Reply with ONLY this JSON, nothing else:
-{{"title": "...", "artist": "...", "url": "...", "lyrics": "full lyrics, one line per line"}}
-If you cannot find it, reply {{"lyrics": ""}}."""
-    try:
-        out = llm.ask(prompt, model or os.environ.get("MV_CLAUDE_MODEL") or "claude-sonnet-5-5",
-                      web=True, timeout=420)
-        data = json.loads(re.search(r"\{.*\}", out, re.S).group(0))
-    except Exception as e:
-        print(f"  (AI tìm lời lỗi: {e})")
-        return []
-    text = str(data.get("lyrics") or "").strip()
-    if not text:
-        return []
-    src = f'Web: {data.get("title", "?")} — {data.get("artist", "?")} {data.get("url", "")}'.strip()
-    return [{"source": src, "text": text}]
+Make sure the lyrics you return really contain these lines. """ + _REPLY
+    by_title = f"""Search the web for the lyrics of the song titled "{title}"{f' by {artist}' if artist else ''}.
+Try queries like "{title} lời bài hát", "{title} lyrics", and lyric sites (loibaihat.biz, nhac.vn,
+zingmp3, nhaccuatui, lyricstranslate, Musixmatch, YouTube descriptions). Several songs may share this
+title: pick the one whose lyrics are closest to these lines heard by speech recognition (words may be
+misheard):
+
+\"\"\"{heard[:800]}\"\"\"
+
+""" + _REPLY
+    prompts = [by_lines] + ([by_title] if title else [])
+    for i, prompt in enumerate(prompts):
+        if i:
+            print("  thử lại: tìm theo tên bài + \"lời bài hát\"…")
+        try:
+            data = _ask_lyrics(prompt.replace("{{", "{").replace("}}", "}"), model)
+        except Exception as e:
+            print(f"  (AI tìm lời lỗi: {e})")
+            continue
+        text = str(data.get("lyrics") or "").strip()
+        if text:
+            src = f'Web: {data.get("title", "?")} — {data.get("artist", "?")} {data.get("url", "")}'.strip()
+            return [{"source": src, "text": text}]
+    print("  AI không tìm thấy lời trên web")
+    return []
 
 
 def find_reference(heard: str, title: str = "", artist: str = "", claude_model: str = "") -> dict | None:

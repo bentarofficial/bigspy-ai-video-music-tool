@@ -889,17 +889,18 @@ function addCover() {
 
 /* ---- sửa bằng AI ---- */
 const aiLog = [];
-const AI_EXAMPLES = ['Đổi màu phụ đề sang vàng, viền đen dày hơn', 'Thêm chuyển cảnh mờ chéo 0.6s cho mọi clip', 'Áp bộ lọc ấm, tăng tương phản nhẹ', 'Làm tối các video 30%', 'Thêm tiêu đề 3 giây đầu'];
+const AI_EXAMPLES = ['Đổi màu phụ đề sang vàng, viền đen dày hơn', 'Thêm chuyển cảnh mờ chéo 0.6s cho mọi clip', 'Áp bộ lọc ấm, tăng tương phản nhẹ', 'Làm tối các video 30%', 'Thêm tiêu đề 3 giây đầu', 'Phụ đề sai lời, tra lời bài hát và sửa lại cho đúng'];
 function renderAI(box) {
   box.innerHTML = `<h3>Sửa bằng AI</h3>
     <div class="ailog" id="aiLog"></div>
     <div class="aiex">${AI_EXAMPLES.map((x) => `<button class="ghost" data-aiex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
     <textarea id="aiIn" rows="3" placeholder="Mô tả thay đổi bạn muốn… (Ctrl+Enter để gửi)"></textarea>
-    <div class="btnrow"><button class="ghost" id="aiSend">✦ Gửi cho AI</button></div>
+    <div class="btnrow"><button class="ghost" id="aiSend">✦ Gửi cho AI</button><button class="ghost" id="aiLyrics" title="Tra lời bài hát trên mạng, đối chiếu và sửa chữ phụ đề sai (giữ thời gian karaoke). Nếu ô bên trên có lời bài hát thì dùng lời đó.">🔎 Tra & sửa lời phụ đề</button></div>
     <p class="hint">AI đọc timeline hiện tại (và clip đang chọn) rồi tự chỉnh. Không ưng thì Hoàn tác (Ctrl+Z).</p>`;
   drawAILog();
   $$('[data-aiex]', box).forEach((b) => (b.onclick = () => { $('#aiIn').value = b.dataset.aiex; $('#aiIn').focus(); }));
-  $('#aiSend').onclick = sendAI;
+  $('#aiSend').onclick = () => sendAI();
+  $('#aiLyrics').onclick = () => sendAI(true);
   $('#aiIn').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendAI(); };
 }
 /* Bản lưu trước mỗi lần AI sửa (giữ 10 bản, còn cả sau khi tải lại trang) -> "khôi phục lại" không cần gọi AI. */
@@ -924,22 +925,26 @@ function drawAILog() {
   if ($('#aiUndoAll')) $('#aiUndoAll').onclick = () => one(true);
   el.scrollTop = el.scrollHeight;
 }
-async function sendAI() {
-  const inp = $('#aiIn'), btn = $('#aiSend'), text = inp.value.trim();
-  if (!text || btn.disabled) return;
+async function sendAI(fixLyrics = false) {
+  const inp = $('#aiIn'), btn = $(fixLyrics ? '#aiLyrics' : '#aiSend'), label = btn.textContent, text = inp.value.trim();
+  if ((!text && !fixLyrics) || btn.disabled) return;
   if (RESTORE_RE.test(text)) { inp.value = ''; aiLog.length = 0; aiLog.push({who: 'me', text}, {who: 'ai', text: '✓ ' + restoreAI(ALL_RE.test(text))}); return drawAILog(); }
-  aiLog.push({who: 'me', text}); inp.value = ''; btn.disabled = true; btn.textContent = 'AI đang làm…';
-  aiLog.push({who: 'ai wait', text: 'Đang xử lý…'}); drawAILog();
+  aiLog.push({who: 'me', text: fixLyrics ? '🔎 Tra & sửa lời phụ đề' + (text ? ' theo lời đã dán' : '') : text}); inp.value = '';
+  btn.disabled = true; btn.textContent = fixLyrics ? 'Đang tra lời…' : 'AI đang làm…';
+  aiLog.push({who: 'ai wait', text: fixLyrics && !text ? 'Đang research lời bài hát trên mạng (có thể mất vài phút)…' : 'Đang xử lý…'}); drawAILog();
   try {
-    const r = await apiCall(`/api/jobs/${JOB}/ai-edit`, {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({prompt: text, timeline: TL, selected: [...sel],
-        presets: Object.keys(window.TLPlayer?.FILTER_PRESETS || {}), transitions: TRANS.map((t) => t[0])})});
+    const r = fixLyrics
+      ? await apiCall(`/api/jobs/${JOB}/fix-lyrics`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({timeline: TL, lyrics: text})})
+      : await apiCall(`/api/jobs/${JOB}/ai-edit`, {method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({prompt: text, timeline: TL, selected: [...sel],
+            presets: Object.keys(window.TLPlayer?.FILTER_PRESETS || {}), transitions: TRANS.map((t) => t[0])})});
     const before = snap(), n = applyAIOps(r.ops || []);
     if (n) { aiSnaps.push(before); if (aiSnaps.length > 10) aiSnaps.shift(); saveAISnaps(); }
     // làm xong -> dọn câu lệnh cũ, chỉ giữ kết quả lần gần nhất cho nhẹ
     aiLog.length = 0; aiLog.push({who: 'ai', text: '✓ ' + (r.reply || 'Xong.') + (n ? ` (${n} thay đổi)` : '')});
   } catch (e) { aiLog.pop(); aiLog.push({who: 'ai err', text: '⚠ ' + e.message}); }
-  btn.disabled = false; btn.textContent = '✦ Gửi cho AI'; drawAILog();
+  btn.disabled = false; btn.textContent = label; drawAILog();
 }
 /* Xuất xong: bỏ lịch sử hoàn tác + nhật ký AI trong bộ nhớ, xoá file tạm trên máy (giữ video đã xuất). */
 async function cleanupAfterExport() {

@@ -589,7 +589,12 @@ Quy ước clip: start/dur tính bằng giây; video có volume (0-2), dim (0-1,
 scale, x, y (% vị trí, 50 = giữa), kenBurns (bool), speed, fadeIn/fadeOut (giây),
 transition {"type": "<một trong: {transitions}>", "dur": 0.5}. "Mờ chéo" = "fade".
 Câu lời (type "lyrics") có subtitle {mode: karaoke|preview|full, fontFamily, fontSize, color, highlightColor,
-strokeColor, strokeWidth, uppercase, position: bottom|center|top}. Không sửa nội dung chữ của câu lời.
+strokeColor, strokeWidth, uppercase, position: bottom|center|top}. Chữ của mỗi câu nằm ở "name".
+SỬA CHỮ PHỤ ĐỀ (lời):
+- Người dùng nói phụ đề/lời sai, chưa khớp, cần tra lại lời bài hát -> {"op":"fix_lyrics","lyrics":""}
+  (máy sẽ tự research lời chuẩn trên mạng rồi đối chiếu và sửa mọi câu, giữ thời gian karaoke).
+  Nếu người dùng dán sẵn lời đúng trong yêu cầu, đưa toàn bộ lời đó vào "lyrics".
+- Người dùng chỉ rõ một/vài câu cần đổi thành chữ gì -> {"op":"set_text","id":"<clip id>","text":"<chữ mới>"}
 Khi đổi kiểu phụ đề, áp dụng cho MỌI clip lyrics. Chỉ dùng id có trong timeline. Không tự bịa file media mới.
 Nếu yêu cầu không làm được, trả "ops": [] và giải thích trong "reply".
 
@@ -641,7 +646,84 @@ def ai_edit(job_id: str, body: dict):
         res = None
     if not isinstance(res, dict) or not isinstance(res.get("ops"), list):
         raise HTTPException(500, "AI trả về không đúng định dạng: " + out.strip()[:200])
-    return {"reply": str(res.get("reply") or ""), "ops": res["ops"]}
+    reply, ops = str(res.get("reply") or ""), []
+    for o in res["ops"]:
+        if not isinstance(o, dict):
+            continue
+        if o.get("op") == "fix_lyrics":
+            r = fix_lyrics_ops(job_id, tl, str(o.get("lyrics") or ""))
+            ops += r["ops"]
+            reply = (reply + " " + r["reply"]).strip()
+        elif o.get("op") == "set_text":
+            ops += set_text_ops(tl, str(o.get("id") or ""), str(o.get("text") or ""))
+        else:
+            ops.append(o)
+    return {"reply": reply, "ops": ops}
+
+
+def _lyric_clips(tl: dict) -> list[dict]:
+    cs = [c for c in tl.get("clips", []) if c.get("type") == "lyrics" and c.get("lines")]
+    return sorted(cs, key=lambda c: c.get("start", 0))
+
+
+def _line_update(c: dict, words: list[dict]) -> dict:
+    ln = {"start": words[0]["start"], "end": words[-1]["end"], "words": words}
+    return {"op": "update", "ids": [c["id"]], "set": {"lines": [ln], "name": " ".join(w["text"] for w in words)}}
+
+
+def set_text_ops(tl: dict, clip_id: str, text: str) -> list[dict]:
+    """Thay chữ một câu; chia đều thời gian câu cho các chữ mới."""
+    c = next((x for x in _lyric_clips(tl) if x["id"] == clip_id), None)
+    toks = text.split()
+    if not c or not toks:
+        return []
+    old = [w for ln in c["lines"] for w in ln.get("words", [])]
+    a = old[0]["start"] if old else c["lines"][0]["start"]
+    b = old[-1]["end"] if old else c["lines"][0]["end"]
+    if len(toks) == len(old):  # cùng số chữ -> giữ nguyên thời gian từng chữ
+        words = [dict(w, text=t) for w, t in zip(old, toks)]
+    else:
+        k = (b - a) / len(toks)
+        words = [{"text": t, "start": round(a + i * k, 3), "end": round(a + (i + 1) * k, 3)} for i, t in enumerate(toks)]
+    return [_line_update(c, words)]
+
+
+def fix_lyrics_ops(job_id: str, tl: dict, ref_text: str = "") -> dict:
+    """Research lời chuẩn (hoặc dùng lời người dùng đưa), đối chiếu với phụ đề hiện tại và sửa chữ sai."""
+    from musicvideo import lyrics as lyr, lyrics_lookup
+    clips = _lyric_clips(tl)
+    if not clips:
+        return {"reply": "Timeline chưa có phụ đề lời để sửa.", "ops": []}
+    rec = [[dict(w) for ln in c["lines"] for w in ln.get("words", [])] for c in clips]
+    heard = " ".join(w["text"] for line in rec for w in line)
+    src = "lời bạn đưa"
+    if not ref_text.strip():
+        d = job_dir(job_id)
+        f = d / "lyrics_input.txt"
+        if f.exists():
+            ref_text, src = f.read_text(encoding="utf-8"), "lời đã dán khi tạo video"
+        else:
+            meta = read_meta(d)
+            ref = lyrics_lookup.find_reference(heard, meta.get("title", ""), meta.get("subtext", ""))
+            if not ref:
+                return {"reply": "Đã research nhưng không tìm được lời chuẩn khớp với bài này — "
+                                 "hãy dán lời đúng vào ô AI (vd: \"sửa phụ đề theo lời: ...\").", "ops": []}
+            ref_text, src = ref["text"], f'{ref["source"]} (khớp {ref["score"]:.0%})'
+            (d / "lyrics_reference.txt").write_text(f"# {src}\n{ref_text}", encoding="utf-8")
+    fixed, n = lyr.correct_with_reference(rec, ref_text, max_fix=12)
+    ops = [_line_update(c, ws) for c, ws, old in zip(clips, fixed, rec)
+           if ws and [w["text"] for w in ws] != [w["text"] for w in old]]
+    if not n or not ops:
+        return {"reply": f"Đã đối chiếu với {src}: phụ đề đã khớp, không có chữ nào cần sửa.", "ops": []}
+    return {"reply": f"Đã sửa {n} chữ theo {src}.", "ops": ops}
+
+
+@app.post("/api/jobs/{job_id}/fix-lyrics")
+def fix_lyrics(job_id: str, body: dict):
+    tl = body.get("timeline")
+    if not isinstance(tl, dict):
+        raise HTTPException(400, "Thiếu timeline")
+    return fix_lyrics_ops(job_id, tl, str(body.get("lyrics") or ""))
 
 
 @app.post("/api/jobs/{job_id}/media")
@@ -763,6 +845,7 @@ def cleanup_job(job_id: str):
 def _last_export(job_id: str) -> Path:
     name = read_meta(job_dir(job_id)).get("lastExport")
     f = EXPORTS / name if name else None
+    shutil.rmtree(d / "render-public", ignore_errors=True)
     if not f or not f.exists():
         raise HTTPException(404, "Chưa có file xuất")
     return f
