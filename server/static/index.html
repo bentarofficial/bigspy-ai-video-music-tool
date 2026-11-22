@@ -454,7 +454,11 @@ function drawWave() {
       g.beginPath(); g.roundRect(x - hw * 1.5, (H - hh) / 2, hw * 3, hh, hw); g.fill();
     }
   }
-  if (player?.pos != null) { g.fillStyle = '#fff'; g.fillRect(X(player.pos), 0, 2, H); }
+  if (player?.pos != null) { // đầu phát: kéo được để nghe từ chỗ khác
+    const x = X(player.pos), k = 5 * devicePixelRatio;
+    g.fillStyle = '#fff'; g.fillRect(x - devicePixelRatio, 0, 2 * devicePixelRatio, H);
+    g.beginPath(); g.moveTo(x - k, 0); g.lineTo(x + k, 0); g.lineTo(x, k * 1.4); g.closePath(); g.fill();
+  }
   const bar = $('#waveBar'), zoomed = span < buf.duration - 0.01;
   bar.hidden = !zoomed;
   if (zoomed) { const th = bar.firstElementChild; th.style.left = v0 / buf.duration * 100 + '%'; th.style.width = Math.max(4, span / buf.duration * 100) + '%'; }
@@ -464,7 +468,7 @@ function drawWave() {
   }
 }
 
-// Kéo chuột: vùng trống = chọn đoạn mới | sát 2 đầu = kéo giãn đầu đó | bên trong đoạn = dời cả đoạn
+// Kéo chuột: vùng trống = chọn đoạn mới | sát 2 đầu = kéo giãn/thu đầu đó | bên trong đoạn = không làm gì
 let drag = null;
 const EDGE = 8; // px: khoảng "bắt" đầu mút
 const tAt = ev => { const r = wave.getBoundingClientRect(); return v0 + Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width)) * (v1 - v0); };
@@ -486,11 +490,12 @@ wave.addEventListener('wheel', ev => {
   drawWave(); wave.style.cursor = CURSOR[hitTest(ev)];
 }, {passive: false});
 function hitTest(ev) {
-  const s = +cs.value, e = +ce.value; if (!(e > s)) return 'new';
   const x = ev.clientX - wave.getBoundingClientRect().left;
+  if (player?.pos != null && Math.abs(x - xOf(player.pos)) <= EDGE) return 'seek';
+  const s = +cs.value, e = +ce.value; if (!(e > s)) return 'new';
   if (Math.abs(x - xOf(s)) <= EDGE) return 'start';
   if (Math.abs(x - xOf(e)) <= EDGE) return 'end';
-  if (x > xOf(s) && x < xOf(e)) return 'move';
+  if (x > xOf(s) && x < xOf(e)) return 'none'; // không cho cầm cả đoạn kéo đi
   return 'new';
 }
 // thanh trượt dưới sóng âm: kéo nút để dời khung đang xem, bấm vào rãnh để nhảy tới đó
@@ -506,14 +511,15 @@ function hitTest(ev) {
   bar.onpointermove = ev => { if (!grab) return; const r = bar.getBoundingClientRect(); panTo(grab.v0 + (ev.clientX - grab.x) / r.width * buf.duration); };
   bar.onpointerup = bar.onpointercancel = () => { grab = null; bar.classList.remove('drag'); };
 })();
-const CURSOR = {start: 'ew-resize', end: 'ew-resize', move: 'grab', new: 'crosshair'};
+const CURSOR = {seek: 'col-resize', start: 'ew-resize', end: 'ew-resize', none: 'default', new: 'crosshair'};
 wave.onpointerdown = ev => {
   if (!buf || ev.button !== 0) return; // chỉ chuột trái
   ev.preventDefault();
   const mode = hitTest(ev), t = tAt(ev);
+  if (mode === 'none') return;
   drag = {mode, from: t, s: +cs.value, e: +ce.value, moved: false};
+  if (mode === 'seek') { player.seeking = true; player.src.onended = null; player.src.stop(); }
   wave.setPointerCapture(ev.pointerId);
-  if (mode === 'move') wave.style.cursor = 'grabbing';
 };
 wave.onpointermove = ev => {
   if (!buf) return;
@@ -522,10 +528,10 @@ wave.onpointermove = ev => {
   if (!drag) { wave.style.cursor = CURSOR[hitTest(ev)]; return; }
   const t = tAt(ev), dur = buf.duration;
   if (Math.abs(t - drag.from) > 0.05) drag.moved = true;
+  if (drag.mode === 'seek') { const [a, b] = playRange(); player.pos = Math.max(a, Math.min(b - 0.1, t)); drawWave(); return; }
   if (drag.mode === 'new') { cs.value = Math.min(drag.from, t).toFixed(1); ce.value = Math.max(drag.from, t).toFixed(1); }
   else if (drag.mode === 'start') { const v = Math.min(t, drag.e - 0.5); cs.value = Math.max(0, v).toFixed(1); }
   else if (drag.mode === 'end') { const v = Math.max(t, drag.s + 0.5); ce.value = Math.min(dur, v).toFixed(1); }
-  else { const len = drag.e - drag.s, ns = Math.max(0, Math.min(dur - len, drag.s + t - drag.from)); cs.value = ns.toFixed(1); ce.value = (ns + len).toFixed(1); }
   updateCut();
 };
 wave.onpointerup = ev => {
@@ -534,7 +540,10 @@ wave.onpointerup = ev => {
   if (drag.mode === 'new' && !drag.moved) { const L = +$('#cutLen').value, t = tAt(ev); cs.value = Math.max(0, Math.min(t, buf.duration - L)).toFixed(1); ce.value = Math.min(buf.duration, +cs.value + L).toFixed(1); }
   endDrag(); wave.style.cursor = CURSOR[hitTest(ev)]; updateCut();
 };
-function endDrag() { drag = null; }
+function endDrag() {
+  if (drag?.mode === 'seek' && player?.seeking) playFrom(player.pos); // thả đầu phát -> nghe tiếp từ đó
+  drag = null;
+}
 // nhả chuột ở bất kỳ đâu trên trang / mất capture / cửa sổ mất focus -> luôn kết thúc kéo
 wave.onpointercancel = wave.onlostpointercapture = () => endDrag();
 addEventListener('pointerup', () => { if (drag) { endDrag(); updateCut(); } });
@@ -560,14 +569,21 @@ $('#suggest').onclick = () => {
   cs.value = (bi / 2).toFixed(1); ce.value = Math.min(buf.duration, bi / 2 + L).toFixed(1); updateCut();
 };
 $('#clearCut').onclick = () => { cs.value = ce.value = ''; updateCut(); };
+// Khoảng nghe thử: đoạn đã chọn, hoặc cả bài nếu chưa chọn
+function playRange() { const s = +cs.value || 0; return [s, +ce.value > s ? +ce.value : buf.duration]; }
+// Phát từ vị trí `from` tới hết đoạn. Kéo thanh đầu phát (lúc đang nghe) để nhảy tới chỗ khác.
+function playFrom(from) {
+  const [, e] = playRange(); if (from >= e - 0.05) { stopPlay(); return; }
+  const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start(0, from, e - from);
+  const t0 = ctx.currentTime, me = {src, pos: from}; player = me; $('#playCut').textContent = '■ Dừng';
+  const tick = () => { if (player !== me || me.seeking) return; me.pos = from + ctx.currentTime - t0; drawWave(); requestAnimationFrame(tick); }; tick();
+  src.onended = () => { if (player === me) stopPlay(); };
+}
+function stopPlay() { if (player) { player.src.onended = null; try { player.src.stop(); } catch {} } player = null; $('#playCut').textContent = '▶ Nghe thử'; drawWave(); }
 $('#playCut').onclick = () => {
   if (!buf) return;
-  if (player) { player.src.stop(); return; }
-  const s = +cs.value || 0, e = +ce.value > s ? +ce.value : buf.duration;
-  const src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start(0, s, e - s);
-  const t0 = ctx.currentTime; player = {src, pos: s}; $('#playCut').textContent = '■ Dừng';
-  const tick = () => { if (!player) return; player.pos = s + ctx.currentTime - t0; drawWave(); requestAnimationFrame(tick); }; tick();
-  src.onended = () => { player = null; $('#playCut').textContent = '▶ Nghe thử'; drawWave(); };
+  if (player) return stopPlay();
+  playFrom(playRange()[0]); // bấm Nghe thử -> luôn từ đầu đoạn
 };
 addEventListener('resize', drawWave);
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('has'); };
