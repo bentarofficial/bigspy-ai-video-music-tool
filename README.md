@@ -60,7 +60,6 @@ cd remotion; npm install; cd ..
 copy .env.example .env    # rồi điền PIXABAY_API_KEY (hoặc nhập trong giao diện web)
 ```
 
-Tùy chọn tách giọng hát để nhận lời chuẩn hơn: `pip install demucs` (nặng, cần PyTorch).
 
 ## Chạy
 

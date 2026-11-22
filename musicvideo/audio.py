@@ -1,4 +1,4 @@
-"""Xử lý audio: chuẩn hóa bằng FFmpeg (bản đóng gói sẵn qua imageio-ffmpeg) và tách giọng (Demucs, tùy chọn)."""
+"""Xử lý audio: chuẩn hóa bằng FFmpeg (bản đóng gói sẵn qua imageio-ffmpeg)."""
 import subprocess
 import sys
 from pathlib import Path
@@ -44,16 +44,3 @@ def duration_of(wav: Path) -> float:
     info = sf.info(str(wav))
     return info.frames / info.samplerate
 
-
-def separate_vocals(src: Path, out_dir: Path) -> Path:
-    """Tách giọng hát bằng Demucs (cần `pip install demucs`). Chạy CPU mất vài phút/bài."""
-    out_dir.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
-        [sys.executable, "-m", "demucs", "--two-stems=vocals", "-n", "htdemucs",
-         "-o", str(out_dir), str(src)],
-        check=True,
-    )
-    vocals = out_dir / "htdemucs" / src.stem / "vocals.wav"
-    if not vocals.exists():
-        raise FileNotFoundError(f"Demucs không tạo ra {vocals}")
-    return vocals

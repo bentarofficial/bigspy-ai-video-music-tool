@@ -48,7 +48,6 @@ def main() -> None:
     p.add_argument("--lyrics", help="file .txt lời bài hát (mỗi dòng một câu) — giúp phụ đề chính xác")
     p.add_argument("--lang", default=None, help="mã ngôn ngữ, ví dụ vi, en (bỏ trống = tự nhận)")
     p.add_argument("--whisper-model", default="small", help="tiny/base/small/medium/large-v3")
-    p.add_argument("--separate", action="store_true", help="tách giọng bằng Demucs trước khi nhận lời")
     p.add_argument("--no-auto-lyrics", action="store_true",
                    help="không tự tìm lời chuẩn trên mạng (LRCLIB / web) để sửa phụ đề")
     p.add_argument("--no-lyrics",action="store_true", help="bài không lời: bỏ qua phụ đề")
@@ -118,10 +117,6 @@ def main() -> None:
     lines: list[dict] = []
     if not a.no_lyrics:
         asr_input = wav
-        if a.separate:
-            print("② Tách giọng hát (Demucs)")
-            vocals = audio.separate_vocals(src, out_dir / "stems")
-            asr_input = audio.to_wav(vocals, out_dir / "vocals16k.wav")
         print(f"③ Nhận diện lời (Whisper {a.whisper_model}, CPU — có thể mất vài phút)")
         recognized = lyrics.transcribe(asr_input, a.whisper_model, a.lang)
         clipped = a.start is not None or a.end is not None

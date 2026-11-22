@@ -353,7 +353,6 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
           <div><label>Effort</label><select name="claude_effort"><option value="">Mặc định</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">XHigh</option><option value="max">Max</option></select></div>
         </div>
         <div class="hint">Model/effort cao hơn chọn cảnh sát nghĩa hơn nhưng chậm và tốn lượt dùng gói Claude hơn.</div>
-        <label class="switch needs-subs"><span>Tách giọng bằng Demucs<small>Chính xác hơn, chậm hơn</small></span><input type="checkbox" name="separate"></label>
       </div>
     </div>
     <div class="sticky-go"><button id="go" disabled>✦ Tạo video</button><div class="gohint" id="goHint">Chọn file nhạc ở bước 1 để bắt đầu</div></div>
@@ -615,7 +614,7 @@ drop.ondrop = e => { e.preventDefault(); file.files = e.dataTransfer.files; file
 // nhớ mọi lựa chọn phong cách / AI & xử lý: lưu vào prefs.json trên máy (giữ qua cả khi tắt app),
 // chỉ đổi khi người dùng tự sửa
 const PREF_KEYS = ['orientation', 'subtitle_mode', 'title_animation', 'title_color', 'scene_length', 'theme',
-  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'lang', 'whisper_model', 'claude_model', 'claude_effort', 'separate', 'with_subs', 'logo_name', 'logo_position', 'logo_size', 'logo_opacity'];
+  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'lang', 'whisper_model', 'claude_model', 'claude_effort', 'with_subs', 'logo_name', 'logo_position', 'logo_size', 'logo_opacity'];
 function readPrefs() {
   const o = {};
   for (const n of PREF_KEYS) { const el = $('#f')[n]; if (el) o[n] = el.type === 'checkbox' ? el.checked : el.value; }
@@ -734,7 +733,6 @@ $('#f').onsubmit = async e => {
   fd.set('audio', file.files[0]);
   const subs = e.target.with_subs.checked;
   fd.delete('with_subs');
-  fd.set('separate', subs && e.target.separate.checked ? 'true' : 'false');
   fd.set('no_lyrics', subs ? 'false' : 'true');
   if (!subs) fd.set('lyrics', '');
   $('#go').disabled = true;

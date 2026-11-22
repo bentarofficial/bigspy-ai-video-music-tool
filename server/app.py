@@ -246,7 +246,7 @@ async def create_job(
     title_animation: str = Form("zoom"), title_color: str = Form("#ffffff"), title_font: str = Form(""), sub_font: str = Form(""),
     sub_color: str = Form("#ffffff"), sub_highlight: str = Form("#ffd23f"),
     title_out: str = Form("fade"), sub_in: str = Form(""), sub_out: str = Form("fade"), theme: str = Form(""),
-    whisper_model: str = Form("small"), separate: bool = Form(False), no_lyrics: bool = Form(False),
+    whisper_model: str = Form("small"), no_lyrics: bool = Form(False),
     scene_length: float = Form(4.0),
     color_filter: str = Form("none"), filter_intensity: float = Form(1.0),
     claude_model: str = Form(""), claude_effort: str = Form(""),
@@ -293,7 +293,6 @@ async def create_job(
         raise HTTPException(400, "thời điểm cắt không hợp lệ")
     if s is not None and s > 0: args += ["--start", f"{s:.3f}"]
     if e is not None and e > (s or 0): args += ["--end", f"{e:.3f}"]
-    if separate: args.append("--separate")
     if no_lyrics: args.append("--no-lyrics")
     if logo_name:
         lf = _logo_path(logo_name)
