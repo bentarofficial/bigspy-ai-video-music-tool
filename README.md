@@ -11,6 +11,15 @@
 
 > Tải file `AI-Music-Video-Setup-x.y.z.exe` trong mục **Assets** của bản phát hành mới nhất, chạy và làm theo hướng dẫn cài đặt.
 
+## Lấy API key Pixabay (miễn phí)
+
+App cần key Pixabay để tìm và tải clip:
+
+1. Đăng nhập (hoặc tạo tài khoản miễn phí) tại [pixabay.com](https://pixabay.com).
+2. Mở [trang API → Search Videos](https://pixabay.com/api/docs/#api_search_videos).
+3. Ở bảng **Parameters**, dòng **key (required)** có ô màu xanh **Your API key**: chép chuỗi trong ô đó.
+4. Trong app, bấm **Cài đặt → Kết nối → Pixabay**, dán key rồi bấm **Kết nối**.
+
 Tải lên một file nhạc (mp3/wav/m4a/flac). Tool sẽ:
 
 1. Nghe và lấy **lời bài hát** kèm thời điểm từng chữ (Whisper). Nếu bạn dán sẵn lời, tool căn lời đó vào giọng hát nên chính xác hơn.
