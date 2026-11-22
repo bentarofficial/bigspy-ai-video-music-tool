@@ -1,4 +1,5 @@
-# Khởi động server ẩn (không cửa sổ) rồi mở trình duyệt.
+# Khởi động server ẩn rồi mở giao diện trong cửa sổ ứng dụng riêng (Edge/Chrome --app).
+# Đóng cửa sổ -> dừng server (nếu chính lần chạy này khởi động server).
 $ErrorActionPreference = 'SilentlyContinue'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -26,4 +27,23 @@ if (-not $running) {
         catch { Start-Sleep -Milliseconds 500 }
     }
 }
-Start-Process $url
+$browser = @(
+    "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe",
+    "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe",
+    "$env:ProgramFiles\Google\Chrome\Application\chrome.exe",
+    "${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe",
+    "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+if (-not $browser) { Start-Process $url; exit }
+
+# Hồ sơ riêng: cửa sổ không lẫn với trình duyệt thường, và tiến trình sống đến khi đóng cửa sổ.
+$profileDir = Join-Path $env:LOCALAPPDATA 'AIMusicVideo\window'
+$app = Start-Process -FilePath $browser -PassThru -ArgumentList @(
+    "--app=$url", "--user-data-dir=`"$profileDir`"", '--no-first-run',
+    '--no-default-browser-check', '--window-size=1500,920'
+)
+if (-not $running) {
+    $app.WaitForExit()
+    & (Join-Path $PSScriptRoot 'stop.ps1') | Out-Null
+}
