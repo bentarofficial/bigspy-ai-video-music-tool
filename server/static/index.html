@@ -200,7 +200,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
 .pvframe .pvlogo{position:absolute;pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
 .pv{display:flex;flex-direction:column;align-items:center;gap:14px}
 .pvframe{position:relative;width:min(240px,60vw);border-radius:14px;overflow:hidden;border:1px solid var(--line2);background:linear-gradient(160deg,#2a3346,#3d2a3a 55%,#1c2230);box-shadow:0 20px 50px -20px rgba(0,0,0,.7);transition:aspect-ratio .25s}
-.pvframe .pvt{position:absolute;left:8%;right:8%;top:18%;text-align:center;font:800 18px/1.15 Inter,sans-serif;text-shadow:0 2px 10px rgba(0,0,0,.5);word-break:break-word}
+.pvframe .pvt{position:absolute;left:8%;right:8%;top:42%;transform:translateY(-50%);text-align:center;font:800 18px/1.15 Inter,sans-serif;text-shadow:0 2px 10px rgba(0,0,0,.5);word-break:break-word}
 .pvframe .pvs{display:block;font-size:11px;font-weight:500;opacity:.85;margin-top:4px}
 .pvframe .pvsub{position:absolute;left:8%;right:8%;bottom:12%;text-align:center;font:700 12px/1.3 Inter,sans-serif;text-shadow:0 1px 4px #000}
 .pvframe .pvsub em{font-style:normal;color:#ffd84d}
@@ -216,6 +216,17 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
   .empty{padding:60px 0}
 }
 @media(max-width:600px){.grid3{grid-template-columns:1fr 1fr}}
+/* bảng chọn màu tự làm: thay bảng có sẵn của trình duyệt để nhập được mã màu + Áp dụng */
+.cpk{position:fixed;z-index:1000;width:236px;padding:10px;background:var(--panel2);border:1px solid var(--line2);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.cpk canvas{display:block;width:100%;border-radius:8px;cursor:crosshair;touch-action:none}
+.cpk .sv{height:140px}.cpk .hue{height:14px;margin-top:10px}
+.cpk .row{display:flex;gap:6px;margin-top:10px;align-items:center}
+.cpk .sw{width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);flex:none}
+.cpk input{flex:1;min-width:0;height:30px;font-family:"JetBrains Mono",monospace;text-transform:uppercase}
+.cpk button{height:30px;padding:0 12px}
+.cpk .pre{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-top:10px}
+.cpk .pre i{aspect-ratio:1;border-radius:6px;cursor:pointer;border:1px solid var(--line2)}
+.cpk .bad{border-color:#f05151}
 </style>
 </head>
 <body>
@@ -412,10 +423,14 @@ file.onchange = () => { if (file.files[0]) { $('#dropTitle').textContent = file.
 // ---- cắt nhạc: sóng âm + chọn đoạn + gợi ý đoạn hay nhất ----
 const wave = $('#wave'), cs = $('#cutStart'), ce = $('#cutEnd');
 let buf = null, peaks = null, rms = null, player = null, ctx = null;
+// cue: chỗ người dùng bấm trong đoạn chọn -> Nghe thử phát từ đây (null = từ đầu đoạn)
+let cue = null;
+const headPos = () => player?.pos ?? cue;
 let v0 = 0, v1 = 0; // khung đang xem (giây) – lăn chuột để phóng to / thu nhỏ quanh con trỏ
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 
 async function loadWave(f) {
+  cue = null; if (player) stopPlay();
   $('#cutter').hidden = false; $('#cutInfo').textContent = 'Đang đọc sóng âm…';
   cs.value = ce.value = ''; buf = null; drawWave();
   try {
@@ -454,8 +469,8 @@ function drawWave() {
       g.beginPath(); g.roundRect(x - hw * 1.5, (H - hh) / 2, hw * 3, hh, hw); g.fill();
     }
   }
-  if (player?.pos != null) { // đầu phát: kéo được để nghe từ chỗ khác
-    const x = X(player.pos), k = 5 * devicePixelRatio;
+  if (headPos() != null) { // đầu phát: kéo được để nghe từ chỗ khác
+    const x = X(headPos()), k = 5 * devicePixelRatio;
     g.fillStyle = '#fff'; g.fillRect(x - devicePixelRatio, 0, 2 * devicePixelRatio, H);
     g.beginPath(); g.moveTo(x - k, 0); g.lineTo(x + k, 0); g.lineTo(x, k * 1.4); g.closePath(); g.fill();
   }
@@ -491,11 +506,11 @@ wave.addEventListener('wheel', ev => {
 }, {passive: false});
 function hitTest(ev) {
   const x = ev.clientX - wave.getBoundingClientRect().left;
-  if (player?.pos != null && Math.abs(x - xOf(player.pos)) <= EDGE) return 'seek';
+  if (headPos() != null && Math.abs(x - xOf(headPos())) <= EDGE) return 'seek';
   const s = +cs.value, e = +ce.value; if (!(e > s)) return 'new';
   if (Math.abs(x - xOf(s)) <= EDGE) return 'start';
   if (Math.abs(x - xOf(e)) <= EDGE) return 'end';
-  if (x > xOf(s) && x < xOf(e)) return 'none'; // không cho cầm cả đoạn kéo đi
+  if (x > xOf(s) && x < xOf(e)) return 'cue'; // bấm trong đoạn = đặt đầu phát (không dời cả đoạn)
   return 'new';
 }
 // thanh trượt dưới sóng âm: kéo nút để dời khung đang xem, bấm vào rãnh để nhảy tới đó
@@ -511,14 +526,14 @@ function hitTest(ev) {
   bar.onpointermove = ev => { if (!grab) return; const r = bar.getBoundingClientRect(); panTo(grab.v0 + (ev.clientX - grab.x) / r.width * buf.duration); };
   bar.onpointerup = bar.onpointercancel = () => { grab = null; bar.classList.remove('drag'); };
 })();
-const CURSOR = {seek: 'col-resize', start: 'ew-resize', end: 'ew-resize', none: 'default', new: 'crosshair'};
+const CURSOR = {seek: 'col-resize', start: 'ew-resize', end: 'ew-resize', cue: 'pointer', new: 'crosshair'};
 wave.onpointerdown = ev => {
   if (!buf || ev.button !== 0) return; // chỉ chuột trái
   ev.preventDefault();
   const mode = hitTest(ev), t = tAt(ev);
-  if (mode === 'none') return;
+  if (mode === 'cue') { drag = {mode: 'seek', from: t, moved: false}; setHead(t); wave.setPointerCapture(ev.pointerId); return; }
   drag = {mode, from: t, s: +cs.value, e: +ce.value, moved: false};
-  if (mode === 'seek') { player.seeking = true; player.src.onended = null; player.src.stop(); }
+  if (mode === 'seek') setHead(headPos());
   wave.setPointerCapture(ev.pointerId);
 };
 wave.onpointermove = ev => {
@@ -528,7 +543,7 @@ wave.onpointermove = ev => {
   if (!drag) { wave.style.cursor = CURSOR[hitTest(ev)]; return; }
   const t = tAt(ev), dur = buf.duration;
   if (Math.abs(t - drag.from) > 0.05) drag.moved = true;
-  if (drag.mode === 'seek') { const [a, b] = playRange(); player.pos = Math.max(a, Math.min(b - 0.1, t)); drawWave(); return; }
+  if (drag.mode === 'seek') { setHead(t); return; }
   if (drag.mode === 'new') { cs.value = Math.min(drag.from, t).toFixed(1); ce.value = Math.max(drag.from, t).toFixed(1); }
   else if (drag.mode === 'start') { const v = Math.min(t, drag.e - 0.5); cs.value = Math.max(0, v).toFixed(1); }
   else if (drag.mode === 'end') { const v = Math.max(t, drag.s + 0.5); ce.value = Math.min(dur, v).toFixed(1); }
@@ -541,7 +556,7 @@ wave.onpointerup = ev => {
   endDrag(); wave.style.cursor = CURSOR[hitTest(ev)]; updateCut();
 };
 function endDrag() {
-  if (drag?.mode === 'seek' && player?.seeking) playFrom(player.pos); // thả đầu phát -> nghe tiếp từ đó
+  if (drag?.mode === 'seek' && player?.seeking) playFrom(player.pos); // đang nghe: thả đầu phát -> nghe tiếp từ đó
   drag = null;
 }
 // nhả chuột ở bất kỳ đâu trên trang / mất capture / cửa sổ mất focus -> luôn kết thúc kéo
@@ -550,7 +565,14 @@ addEventListener('pointerup', () => { if (drag) { endDrag(); updateCut(); } });
 addEventListener('blur', endDrag);
 cs.oninput = ce.oninput = () => updateCut();
 $('#cutDur').oninput = () => { const L = +$('#cutDur').value; if (!(L > 0)) return; const s = +cs.value || 0, mx = buf ? buf.duration : Infinity; if (!cs.value) cs.value = '0'; ce.value = Math.min(mx, s + L).toFixed(1); updateCut(true); };
-function updateCut(fromDur) { const s = +cs.value, e = +ce.value; if (fromDur !== true && document.activeElement !== $('#cutDur')) $('#cutDur').value = e > s ? (e - s).toFixed(1) : ''; $('#cutInfo').textContent = e > s ? `Đoạn chọn: ${fmt(s)} → ${fmt(e)} (${(e - s).toFixed(1)}s)` : (buf ? `Dùng cả bài (${fmt(buf.duration)})` : ''); drawWave(); }
+// Dời đầu phát tới t (kẹp trong đoạn nghe). Đang phát thì tạm dừng, thả chuột sẽ phát tiếp từ đó.
+function setHead(t) {
+  const [a, b] = playRange(); t = Math.max(a, Math.min(b - 0.1, t));
+  if (player) { if (!player.seeking) { player.seeking = true; player.src.onended = null; try { player.src.stop(); } catch {} } player.pos = t; }
+  cue = t; drawWave();
+}
+function updateCut(fromDur) {
+  if (cue != null && buf) { const [a, b] = playRange(); if (cue < a || cue >= b) cue = null; } /* đổi đoạn -> bỏ chỗ đã bấm nếu nằm ngoài */ const s = +cs.value, e = +ce.value; if (fromDur !== true && document.activeElement !== $('#cutDur')) $('#cutDur').value = e > s ? (e - s).toFixed(1) : ''; $('#cutInfo').textContent = e > s ? `Đoạn chọn: ${fmt(s)} → ${fmt(e)} (${(e - s).toFixed(1)}s)` : (buf ? `Dùng cả bài (${fmt(buf.duration)})` : ''); drawWave(); }
 
 $('#suggest').onclick = () => {
   if (!rms) return;
@@ -583,7 +605,7 @@ function stopPlay() { if (player) { player.src.onended = null; try { player.src.
 $('#playCut').onclick = () => {
   if (!buf) return;
   if (player) return stopPlay();
-  playFrom(playRange()[0]); // bấm Nghe thử -> luôn từ đầu đoạn
+  playFrom(cue ?? playRange()[0]); // từ chỗ đã bấm trong đoạn, chưa bấm thì từ đầu đoạn
 };
 addEventListener('resize', drawWave);
 drop.ondragover = e => { e.preventDefault(); drop.classList.add('has'); };
@@ -961,6 +983,68 @@ addEventListener('keydown', e => {
     $('updBtn').textContent=j.message;
     if(j.ok){const wait=async()=>{try{await fetch('/api/health');location.reload()}catch(e){setTimeout(wait,2000)}};setTimeout(wait,6000);}
   };
+})();
+</script>
+<script>
+// Bảng chọn màu: bấm ô màu (.colorf) -> vùng sáng/đậm, thanh sắc màu, ô nhập mã + nút Áp dụng, màu nhanh
+(() => {
+  const PRE = ['#ffffff', '#000000', '#ffd23f', '#ff4fa3', '#f05151', '#4fd1ff', '#5be37d', '#a970ff'];
+  let pk = null, inp = null, h = 0, sat = 0, val = 1;
+  const hex2hsv = x => { const n = parseInt(x.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); let hh = 0;
+    if (d) hh = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [(hh * 60 + 360) % 360, mx ? d / mx : 0, mx]; };
+  const hsv2hex = (hh, ss, vv) => { const f = k => { const q = (k + hh / 60) % 6; return vv - vv * ss * Math.max(0, Math.min(q, 4 - q, 1)); };
+    return '#' + [f(5), f(3), f(1)].map(c => Math.round(c * 255).toString(16).padStart(2, '0')).join(''); };
+  const norm = v => { v = v.trim(); if (!v.startsWith('#')) v = '#' + v; if (/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map(c => c + c).join(''); return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null; };
+  function draw() {
+    const sv = pk.querySelector('.sv'), hu = pk.querySelector('.hue'), dpr = devicePixelRatio;
+    for (const c of [sv, hu]) { c.width = c.clientWidth * dpr; c.height = c.clientHeight * dpr; }
+    let g = sv.getContext('2d'), W = sv.width, H = sv.height;
+    g.fillStyle = `hsl(${h},100%,50%)`; g.fillRect(0, 0, W, H);
+    let gr = g.createLinearGradient(0, 0, W, 0); gr.addColorStop(0, '#fff'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    gr = g.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, '#000'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.lineWidth = 2 * dpr; g.strokeStyle = '#fff'; g.beginPath(); g.arc(sat * W, (1 - val) * H, 6 * dpr, 0, 7); g.stroke();
+    g = hu.getContext('2d'); W = hu.width; H = hu.height; gr = g.createLinearGradient(0, 0, W, 0);
+    for (let i = 0; i <= 6; i++) gr.addColorStop(i / 6, `hsl(${i * 60},100%,50%)`); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#fff'; g.fillRect(h / 360 * W - 2 * dpr, 0, 4 * dpr, H);
+    const x = hsv2hex(h, sat, val); pk.querySelector('.sw').style.background = x;
+    const t = pk.querySelector('input'); if (document.activeElement !== t) { t.value = x.toUpperCase(); t.classList.remove('bad'); }
+  }
+  function apply(x) {  // ghi vào ô màu gốc -> các bộ lắng nghe sẵn có (lưu, xem trước, Tinh chỉnh) chạy như cũ
+    inp.value = x; inp.dispatchEvent(new Event('input', {bubbles: true})); inp.dispatchEvent(new Event('change', {bubbles: true}));
+  }
+  const close = () => { pk?.remove(); pk = null; inp = null; };
+  function drag(el, fn) { el.onpointerdown = e => { el.setPointerCapture(e.pointerId); fn(e); el.onpointermove = fn; };
+    el.onpointerup = el.onpointercancel = () => { el.onpointermove = null; apply(hsv2hex(h, sat, val)); }; }
+  function open(c) {
+    close(); inp = c; [h, sat, val] = hex2hsv(c.value || '#ffffff');
+    pk = document.createElement('div'); pk.className = 'cpk';
+    pk.innerHTML = `<canvas class="sv"></canvas><canvas class="hue"></canvas>
+      <div class="row"><span class="sw"></span><input maxlength="7" spellcheck="false" placeholder="#RRGGBB"><button type="button">Áp dụng</button></div>
+      <div class="pre">${PRE.map(x => `<i style="background:${x}" data-c="${x}" title="${x.toUpperCase()}"></i>`).join('')}</div>`;
+    document.body.append(pk);
+    const r = c.getBoundingClientRect(), pr = pk.getBoundingClientRect();
+    pk.style.left = Math.max(8, Math.min(innerWidth - pr.width - 8, r.left)) + 'px';
+    pk.style.top = (r.bottom + pr.height + 8 < innerHeight ? r.bottom + 6 : Math.max(8, r.top - pr.height - 6)) + 'px';
+    const sv = pk.querySelector('.sv'), hu = pk.querySelector('.hue'), t = pk.querySelector('input');
+    drag(sv, e => { const b = sv.getBoundingClientRect(); sat = Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)); val = 1 - Math.max(0, Math.min(1, (e.clientY - b.top) / b.height)); draw(); });
+    drag(hu, e => { const b = hu.getBoundingClientRect(); h = Math.max(0, Math.min(359.9, (e.clientX - b.left) / b.width * 360)); draw(); });
+    const ok = () => { const x = norm(t.value); if (!x) { t.classList.add('bad'); t.focus(); return; } [h, sat, val] = hex2hsv(x); t.blur(); draw(); apply(x); close(); };
+    pk.querySelector('button').onclick = ok;
+    t.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); ok(); } if (e.key === 'Escape') close(); };
+    t.oninput = () => t.classList.toggle('bad', !!t.value && !norm(t.value));
+    pk.querySelector('.pre').onclick = e => { const x = e.target.dataset.c; if (x) { [h, sat, val] = hex2hsv(x); draw(); apply(x); } };
+    draw(); t.focus(); t.select();
+  }
+  // chặn bảng có sẵn của trình duyệt, mở bảng tự làm
+  document.addEventListener('click', e => {
+    const c = e.target.closest?.('input[type=color]');
+    if (c) { e.preventDefault(); if (inp === c) close(); else open(c); return; }
+    if (pk && !pk.contains(e.target)) close();
+  }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && pk) close(); });
+  addEventListener('resize', close);
 })();
 </script>
 </body>
