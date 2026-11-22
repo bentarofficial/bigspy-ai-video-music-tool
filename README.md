@@ -2,11 +2,11 @@
 
 <p align="center">
   <a href="https://github.com/bentarofficial/bigspy-ai-video-music-tool/releases/latest">
-    <img src="https://img.shields.io/badge/⬇%20Tải%20về%20cho%20Windows-bản%20mới%20nhất-2ea44f?style=for-the-badge" alt="Tải về">
+    <img src="https://img.shields.io/badge/%E2%AC%87%20T%E1%BA%A3i%20v%E1%BB%81%20cho%20Windows-b%E1%BA%A3n%20m%E1%BB%9Bi%20nh%E1%BA%A5t-2ea44f?style=for-the-badge" alt="Tải về">
   </a>
   <br>
-  <img src="https://img.shields.io/github/v/release/bentarofficial/bigspy-ai-video-music-tool?label=phiên%20bản" alt="Phiên bản">
-  <img src="https://img.shields.io/github/downloads/bentarofficial/bigspy-ai-video-music-tool/total?label=lượt%20tải" alt="Lượt tải">
+  <img src="https://img.shields.io/github/v/release/bentarofficial/bigspy-ai-video-music-tool?label=phi%C3%AAn%20b%E1%BA%A3n" alt="Phiên bản">
+  <img src="https://img.shields.io/github/downloads/bentarofficial/bigspy-ai-video-music-tool/total?label=l%C6%B0%E1%BB%A3t%20t%E1%BA%A3i" alt="Lượt tải">
 </p>
 
 > Tải file `AI-Music-Video-Setup-x.y.z.exe` trong mục **Assets** của bản phát hành mới nhất, chạy và làm theo hướng dẫn cài đặt.
