@@ -15,6 +15,8 @@ const Logo: React.FC<{l: NonNullable<VideoProps['logo']>}> = ({l}) => {
 	return (
 		<Img
 			src={staticFile(l.src)}
+			maxRetries={4}
+			delayRenderTimeoutInMilliseconds={120000}
 			style={{position: 'absolute', width: (base * l.size) / 100, height: 'auto', opacity: l.opacity,
 				[v]: m, [h]: m, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,.35))'}}
 		/>
