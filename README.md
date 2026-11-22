@@ -20,6 +20,28 @@ App cần key Pixabay để tìm và tải clip:
 3. Ở bảng **Parameters**, dòng **key (required)** có ô màu xanh **Your API key**: chép chuỗi trong ô đó.
 4. Trong app, bấm **Cài đặt → Kết nối → Pixabay**, dán key rồi bấm **Kết nối**.
 
+## Kết nối AI: Claude CLI hoặc Codex CLI (tuỳ chọn)
+
+Có AI, app sẽ chọn cảnh quay theo nội dung lời bài hát, tìm lời chuẩn của bài và dùng được tab **AI chỉnh sửa** trong Editor. Không có AI, app vẫn chạy được, chỉ chọn cảnh theo ô **Chủ đề hình ảnh**.
+
+Chỉ cần **một trong hai**. Cài cả hai thì Claude được dùng trước, Codex làm dự phòng. App dùng gói bạn đã đăng nhập trong CLI, không cần API key và không tính phí API riêng.
+
+**Claude CLI** (cần gói Claude Pro/Max):
+
+```powershell
+npm install -g @anthropic-ai/claude-code
+claude
+```
+
+**ChatGPT Codex CLI** (cần gói ChatGPT Plus/Pro):
+
+```powershell
+npm install -g @openai/codex
+codex
+```
+
+Lần đầu chạy lệnh `claude` hoặc `codex`, làm theo hướng dẫn để đăng nhập rồi thoát. Sau đó mở lại app, vào **Cài đặt → Kết nối**: CLI đã cài sẽ hiện nút **Kết nối** / **Huỷ kết nối** để bật hoặc tắt.
+
 Tải lên một file nhạc (mp3/wav/m4a/flac). Tool sẽ:
 
 1. Nghe và lấy **lời bài hát** kèm thời điểm từng chữ (Whisper). Nếu bạn dán sẵn lời, tool căn lời đó vào giọng hát nên chính xác hơn.
