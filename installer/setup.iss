@@ -18,6 +18,7 @@ OutputDir=..\dist
 OutputBaseFilename=AI-Music-Video-Setup-{#MyVersion}
 Compression=lzma2
 SolidCompression=yes
+SetupIconFile=..\assets\icon.ico
 UninstallDisplayIcon={app}\AI Music Video.exe
 
 [Files]

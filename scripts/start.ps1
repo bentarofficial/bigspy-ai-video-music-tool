@@ -43,7 +43,8 @@ if ($Browser -or -not $browser) { Start-Process $url; exit }
 $profileDir = Join-Path $env:LOCALAPPDATA 'AIMusicVideo\window'
 $app = Start-Process -FilePath $browser -PassThru -ArgumentList @(
     "--app=$url", "--user-data-dir=`"$profileDir`"", '--no-first-run',
-    '--no-default-browser-check', '--window-size=1500,920'
+    '--no-default-browser-check', '--window-size=1500,920',
+    '--force-dark-mode'  # thanh tiêu đề tối, khớp màu giao diện
 )
 if (-not $running) {
     $app.WaitForExit()

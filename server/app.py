@@ -78,6 +78,12 @@ def spawn(job_id: str, d: Path, args: list[str]) -> None:
 
 
 # ---------- trang & cài đặt ----------
+@app.get("/favicon.png")
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse(STATIC / "favicon.png", media_type="image/png")
+
+
 @app.get("/", response_class=HTMLResponse)
 def index():
     html = (Path(__file__).parent / "static" / "index.html").read_text(encoding="utf-8")

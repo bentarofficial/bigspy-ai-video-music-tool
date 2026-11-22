@@ -20,7 +20,7 @@ jobs:
       - name: Build launcher exe
         run: |
           pip install pyinstaller
-          pyinstaller --onefile --noconsole --name "AI Music Video" launcher.py
+          pyinstaller --onefile --noconsole --icon assets/icon.ico --name "AI Music Video" launcher.py
       - name: Stage app files
         shell: pwsh
         run: |
