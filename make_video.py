@@ -5,6 +5,7 @@ Ví dụ:
   python make_video.py song.mp3 --orientation landscape --subtitle-mode preview --theme "ocean, sunset"
   python make_video.py --render-only output/ten-bai/props.json      # render lại sau khi sửa props
 """
+import os
 import argparse
 import json
 import re
@@ -55,6 +56,7 @@ def main() -> None:
     p.add_argument("--fps", type=int, default=30)
     p.add_argument("--scene-length", type=float, default=4.0, help="độ dài mong muốn mỗi cảnh (giây); 0 = auto, chỉ chuyển cảnh khi hát xong một câu")
     p.add_argument("--claude-model", default="", help="model Claude CLI, ví dụ claude-haiku-5-5, claude-sonnet-5-5, claude-opus-5-5, claude-fable-5-2")
+    p.add_argument("--codex-model", default="", help="model Codex CLI (vd gpt-5.6-terra); trống = mặc định của gói")
     p.add_argument("--claude-effort", default="", choices=["", *keywords.EFFORTS], help="mức suy nghĩ của Claude")
     p.add_argument("--theme", help="chủ đề hình ảnh, ví dụ 'ocean, sunset, city night'")
     p.add_argument("--subtitle-mode", choices=["karaoke", "preview", "full"], default="karaoke")
@@ -81,6 +83,8 @@ def main() -> None:
     p.add_argument("--logo-size", type=float, default=14, help="chiều rộng logo, %% cạnh ngắn khung hình")
     p.add_argument("--logo-opacity", type=float, default=0.9)
     a = p.parse_args()
+    if a.codex_model:
+        os.environ["MV_CODEX_MODEL"] = a.codex_model
 
     if a.render_only:
         props = Path(a.render_only).resolve()

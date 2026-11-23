@@ -147,7 +147,18 @@ def get_settings():
             "claudeCli": bool(shutil.which("claude")),
             "claudeEnabled": os.environ.get("CLAUDE_DISABLED", "") != "1",
             "codexCli": bool(shutil.which("codex")),
-            "codexEnabled": os.environ.get("CODEX_DISABLED", "") != "1"}
+            "codexEnabled": os.environ.get("CODEX_DISABLED", "") != "1",
+            "codexModels": _codex_models()}
+
+
+def _codex_models() -> list[dict]:
+    """Model Codex mà gói ChatGPT đang đăng nhập được dùng (đọc cache của Codex CLI)."""
+    try:
+        data = json.loads((Path.home() / ".codex" / "models_cache.json").read_text(encoding="utf-8"))
+        return [{"slug": m["slug"], "name": m.get("display_name") or m["slug"]}
+                for m in data.get("models", []) if m.get("visibility", "list") == "list" and m.get("slug")]
+    except Exception:
+        return []
 
 
 def _set_env(key: str, val: str | None) -> None:
@@ -249,7 +260,7 @@ async def create_job(
     whisper_model: str = Form("small"), no_lyrics: bool = Form(False),
     scene_length: float = Form(4.0),
     color_filter: str = Form("none"), filter_intensity: float = Form(1.0),
-    claude_model: str = Form(""), claude_effort: str = Form(""),
+    claude_model: str = Form(""), claude_effort: str = Form(""), codex_model: str = Form(""),
     start: str = Form(""), end: str = Form(""),
     logo_name: str = Form(""), logo_position: str = Form("top-right"),
     logo_size: float = Form(14), logo_opacity: float = Form(0.9),
@@ -286,6 +297,7 @@ async def create_job(
     if re.fullmatch(r"[a-z0-9]{1,20}", color_filter) and color_filter != "none":
         args += ["--color-filter", color_filter, "--filter-intensity", f"{max(0.0, min(1.0, filter_intensity)):.2f}"]
     if re.fullmatch(r"[a-z0-9.\-]{1,60}", claude_model): args += ["--claude-model", claude_model]
+    if re.fullmatch(r"[a-z0-9.\-]{1,60}", codex_model): args += ["--codex-model", codex_model]
     if claude_effort in {"low", "medium", "high", "xhigh", "max"}: args += ["--claude-effort", claude_effort]
     try:
         s, e = (float(start) if start else None), (float(end) if end else None)
