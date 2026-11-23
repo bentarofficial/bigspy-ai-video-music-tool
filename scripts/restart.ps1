@@ -9,7 +9,7 @@ if (Test-Path $pidFile) {
     Remove-Item $pidFile -Force
 }
 Start-Sleep -Seconds 1
-& (Join-Path $PSScriptRoot 'setup.ps1')
+& (Join-Path $PSScriptRoot 'setup.ps1') -Unattended
 if ($LASTEXITCODE -ne 0) { throw 'Cai dat thu vien sau cap nhat that bai' }
 # Cua so app van mo va tu tai lai trang -> chi chay server, khong mo cua so moi.
 & (Join-Path $PSScriptRoot 'start.ps1') -NoWindow
