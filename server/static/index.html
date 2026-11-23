@@ -739,7 +739,15 @@ syncSubs(); syncGo(); renderPreview();
 loadPrefs().then(() => loadLogos());
 
 // nút Cài đặt: mở/đóng bảng kết nối & phiên bản
-$('#setBtn').onclick = (e) => { e.stopPropagation(); const p = $('#setPop'); p.hidden = !p.hidden; $('#setBtn').classList.toggle('on', !p.hidden); };
+// bảng cài đặt phủ lên danh sách dự án, kéo cao sát dưới thanh logo
+function fitSetPop() {
+  const p = $('#setPop');
+  if (p.hidden) return;
+  const top = document.querySelector('.brand').getBoundingClientRect().bottom + 6;
+  p.style.height = p.style.maxHeight = Math.max(200, document.querySelector('.setwrap').getBoundingClientRect().top - 6 - top) + 'px';
+}
+window.addEventListener('resize', fitSetPop);
+$('#setBtn').onclick = (e) => { e.stopPropagation(); const p = $('#setPop'); p.hidden = !p.hidden; $('#setBtn').classList.toggle('on', !p.hidden); fitSetPop(); };
 document.addEventListener('click', (e) => { if (!e.target.closest('.setwrap')) { $('#setPop').hidden = true; $('#setBtn').classList.remove('on'); } });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#setPop').hidden = true; $('#setBtn').classList.remove('on'); } });
 // chấm cam trên nút khi cần chú ý: chưa kết nối Pixabay hoặc có bản cập nhật
