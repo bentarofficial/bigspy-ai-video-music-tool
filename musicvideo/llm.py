@@ -65,21 +65,32 @@ def _codex(exe: str, prompt: str, effort: str, web: bool, timeout: int) -> str:
 
 
 def ask(prompt: str, model: str = "", effort: str = "", web: bool = False, timeout: int = 600) -> str:
-    """Trả về câu trả lời văn bản. Lỗi ở Claude -> thử Codex. Hết cách -> RuntimeError."""
+    """Trả về câu trả lời văn bản. MV_AI=claude|codex -> chỉ dùng CLI đó; không đặt -> Claude trước, Codex dự phòng."""
     errors = []
-    if exe := claude_path():
-        m = model or os.environ.get("MV_CLAUDE_MODEL") or "claude-haiku-5-5"
-        print(f"  Claude CLI: model={m}, effort={effort or 'mặc định'}{', web' if web else ''}")
-        try:
-            return _claude(exe, prompt, m, effort, web, timeout)
-        except Exception as e:
-            errors.append(f"Claude: {e}")
-            print(f"  (Claude CLI lỗi: {e})")
-    if exe := codex_path():
-        print(f"  Codex CLI (ChatGPT): effort={effort or 'mặc định'}{', web' if web else ''}")
-        try:
-            return _codex(exe, prompt, effort, web, timeout)
-        except Exception as e:
-            errors.append(f"Codex: {e}")
-            print(f"  (Codex CLI lỗi: {e})")
+
+    def try_claude():
+        if exe := claude_path():
+            m = model or os.environ.get("MV_CLAUDE_MODEL") or "claude-haiku-5-5"
+            print(f"  Claude CLI: model={m}, effort={effort or 'mặc định'}{', web' if web else ''}")
+            try:
+                return _claude(exe, prompt, m, effort, web, timeout)
+            except Exception as e:
+                errors.append(f"Claude: {e}")
+                print(f"  (Claude CLI lỗi: {e})")
+
+    def try_codex():
+        if exe := codex_path():
+            print(f"  Codex CLI (ChatGPT): model={os.environ.get('MV_CODEX_MODEL') or 'mặc định'}, "
+                  f"effort={effort or 'mặc định'}{', web' if web else ''}")
+            try:
+                return _codex(exe, prompt, effort, web, timeout)
+            except Exception as e:
+                errors.append(f"Codex: {e}")
+                print(f"  (Codex CLI lỗi: {e})")
+
+    only = os.environ.get("MV_AI")  # người dùng chọn hẳn một model -> chỉ dùng CLI đó, không dự phòng
+    order = {"claude": (try_claude,), "codex": (try_codex,)}.get(only, (try_claude, try_codex))
+    for f in order:
+        if (out := f()) is not None:
+            return out
     raise RuntimeError("; ".join(errors) or "không có Claude CLI hay Codex CLI")

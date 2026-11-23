@@ -366,9 +366,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
         <div class="row">
           <div class="needs-subs"><label>Ngôn ngữ</label><select name="lang"><option value="vi">Tiếng Việt</option><option value="">Tự nhận</option><option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="zh">中文</option></select></div>
           <div class="needs-subs"><label>Model Whisper</label><select name="whisper_model"><option value="small">small (nhanh)</option><option value="medium">medium (chuẩn hơn)</option><option value="large-v3">large-v3 (chuẩn nhất)</option><option value="base">base</option></select></div>
-          <div id="noAiNote" hidden><label>Model AI</label><select disabled><option>Chưa kết nối Claude/Codex CLI</option></select></div>
-          <div id="cxModelField" hidden><label>Model Codex</label><select name="codex_model"><option value="">Mặc định của gói ChatGPT</option></select></div>
-          <div id="clModelField"><label>Model Claude</label><select name="claude_model"><option value="claude-haiku-5-5">Haiku 5.5 (nhanh)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (cân bằng)</option><option value="claude-opus-5-5">Opus 5.5 (hiểu lời sâu)</option><option value="claude-fable-5-2">Fable 5.2 (mạnh nhất)</option></select></div>
+          <div><label>Model AI</label><select name="ai_model" id="aiModel"></select></div>
           <div><label>Effort</label><select name="claude_effort"><option value="">Mặc định</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">XHigh</option><option value="max">Max</option></select></div>
         </div>
         <div class="hint">Model/effort cao hơn chọn cảnh sát nghĩa hơn nhưng chậm và tốn lượt dùng gói Claude hơn.</div>
@@ -633,7 +631,7 @@ drop.ondrop = e => { e.preventDefault(); file.files = e.dataTransfer.files; file
 // nhớ mọi lựa chọn phong cách / AI & xử lý: lưu vào prefs.json trên máy (giữ qua cả khi tắt app),
 // chỉ đổi khi người dùng tự sửa
 const PREF_KEYS = ['orientation', 'subtitle_mode', 'title_animation', 'title_color', 'scene_length', 'theme',
-  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'lang', 'whisper_model', 'claude_model', 'codex_model', 'claude_effort', 'with_subs', 'logo_name', 'logo_position', 'logo_size', 'logo_opacity'];
+  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'lang', 'whisper_model', 'ai_model', 'claude_effort', 'with_subs', 'logo_name', 'logo_position', 'logo_size', 'logo_opacity'];
 function readPrefs() {
   const o = {};
   for (const n of PREF_KEYS) { const el = $('#f')[n]; if (el) o[n] = el.type === 'checkbox' ? el.checked : el.value; }
@@ -647,6 +645,8 @@ function savePrefs() {
 async function loadPrefs() {
   let p = {};
   try { p = await (await fetch('/api/prefs')).json(); } catch {}
+  savedAi = p.ai_model || (p.claude_model ? 'claude:' + p.claude_model : '');
+  fillAiModels();
   for (const n of PREF_KEYS) {
     const el = $('#f')[n], v = p[n];
     if (!el || v === undefined) continue;
@@ -761,6 +761,21 @@ $('#f').onsubmit = async e => {
 };
 
 // ---- keys ----
+// một menu chung: chọn model nào thì chỉ CLI của model đó chạy (không dự phòng)
+const CLAUDE_MODELS = [['claude-haiku-5-5', 'Haiku 5.5 (nhanh)'], ['claude-sonnet-5-5', 'Sonnet 5.5 (cân bằng)'],
+  ['claude-opus-5-5', 'Opus 5.5 (hiểu lời sâu)'], ['claude-fable-5-2', 'Fable 5.2 (mạnh nhất)']];
+let savedAi = '';
+function fillAiModels() {
+  const sel = $('#aiModel'), cur = sel.value || savedAi;
+  const clOn = keys.claudeCli && keys.claudeEnabled, cxOn = keys.codexCli && keys.codexEnabled;
+  let h = '';
+  if (clOn) h += '<optgroup label="Claude CLI">' + CLAUDE_MODELS.map(([v, n]) => `<option value="claude:${v}">${n}</option>`).join('') + '</optgroup>';
+  if (cxOn) h += '<optgroup label="Codex CLI (ChatGPT)"><option value="codex:">Mặc định của gói ChatGPT</option>'
+    + (keys.codexModels || []).map(m => `<option value="codex:${m.slug}">${m.name}</option>`).join('') + '</optgroup>';
+  sel.innerHTML = h || '<option value="">Chưa kết nối Claude/Codex CLI</option>';
+  sel.disabled = !h;
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
 let keys = {};
 async function loadKeys() {
   keys = await api('/api/settings');
@@ -783,13 +798,7 @@ async function loadKeys() {
   $('#cxToggle').hidden = !keys.codexCli;
   $('#cxToggle').textContent = cxOn ? 'Huỷ kết nối' : 'Kết nối';
   $('#cxToggle').className = cxOn ? 'ghost danger' : '';
-  $('#clModelField').hidden = !clOn;
-  $('#cxModelField').hidden = !cxOn;
-  $('#noAiNote').hidden = clOn || cxOn;
-  const cxSel = $('#cxModelField select'), cxCur = cxSel.value;
-  cxSel.innerHTML = '<option value="">Mặc định của gói ChatGPT</option>' + (keys.codexModels || [])
-    .map(m => `<option value="${m.slug}">${m.name}</option>`).join('');
-  if ([...cxSel.options].some(o => o.value === cxCur)) cxSel.value = cxCur;
+  fillAiModels();
 }
 $('#saveKeys').onclick = async () => {
   if (!$('#pix').value.trim()) return $('#pix').focus();
