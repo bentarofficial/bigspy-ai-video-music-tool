@@ -165,11 +165,23 @@ def get_settings():
             "codexModels": _codex_models()}
 
 
+def _codex_hint(desc: str) -> str:
+    """Hậu tố dễ hiểu như model Claude: (nhanh) / (cân bằng) / (mạnh nhất) — đoán từ mô tả tiếng Anh của Codex."""
+    d = desc.lower()
+    for keys, hint in ((("most capable", "frontier", "smartest", "strongest", "flagship", "hardest"), "mạnh nhất"),
+                       (("balanced", "everyday", "general"), "cân bằng"),
+                       (("fast", "affordable", "mini", "simple", "easier", "light"), "nhanh"),
+                       (("reason", "deep", "complex"), "hiểu sâu")):
+        if any(k in d for k in keys):
+            return f" ({hint}{', đời cũ' if 'legacy' in d else ''})"
+    return " (đời cũ)" if "legacy" in d else ""
+
+
 def _codex_models() -> list[dict]:
     """Model Codex mà gói ChatGPT đang đăng nhập được dùng (đọc cache của Codex CLI)."""
     try:
         data = json.loads((Path.home() / ".codex" / "models_cache.json").read_text(encoding="utf-8"))
-        return [{"slug": m["slug"], "name": m.get("display_name") or m["slug"]}
+        return [{"slug": m["slug"], "name": (m.get("display_name") or m["slug"]) + _codex_hint(m.get("description", ""))}
                 for m in data.get("models", []) if m.get("visibility", "list") == "list" and m.get("slug")]
     except Exception:
         return []
