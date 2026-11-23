@@ -366,7 +366,8 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
         <div class="row">
           <div class="needs-subs"><label>Ngôn ngữ</label><select name="lang"><option value="vi">Tiếng Việt</option><option value="">Tự nhận</option><option value="en">English</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="zh">中文</option></select></div>
           <div class="needs-subs"><label>Model Whisper</label><select name="whisper_model"><option value="small">small (nhanh)</option><option value="medium">medium (chuẩn hơn)</option><option value="large-v3">large-v3 (chuẩn nhất)</option><option value="base">base</option></select></div>
-          <div><label>Model Claude</label><select name="claude_model"><option value="claude-haiku-5-5">Haiku 5.5 (nhanh)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (cân bằng)</option><option value="claude-opus-5-5">Opus 5.5 (hiểu lời sâu)</option><option value="claude-fable-5-2">Fable 5.2 (mạnh nhất)</option></select></div>
+          <div id="cxModelNote" hidden><label>Model AI</label><select disabled><option>Codex CLI (model mặc định của gói ChatGPT)</option></select></div>
+          <div id="clModelField"><label>Model Claude</label><select name="claude_model"><option value="claude-haiku-5-5">Haiku 5.5 (nhanh)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (cân bằng)</option><option value="claude-opus-5-5">Opus 5.5 (hiểu lời sâu)</option><option value="claude-fable-5-2">Fable 5.2 (mạnh nhất)</option></select></div>
           <div><label>Effort</label><select name="claude_effort"><option value="">Mặc định</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="xhigh">XHigh</option><option value="max">Max</option></select></div>
         </div>
         <div class="hint">Model/effort cao hơn chọn cảnh sát nghĩa hơn nhưng chậm và tốn lượt dùng gói Claude hơn.</div>
@@ -781,6 +782,8 @@ async function loadKeys() {
   $('#cxToggle').hidden = !keys.codexCli;
   $('#cxToggle').textContent = cxOn ? 'Huỷ kết nối' : 'Kết nối';
   $('#cxToggle').className = cxOn ? 'ghost danger' : '';
+  $('#clModelField').hidden = !clOn && cxOn;
+  $('#cxModelNote').hidden = clOn || !cxOn;
 }
 $('#saveKeys').onclick = async () => {
   if (!$('#pix').value.trim()) return $('#pix').focus();
