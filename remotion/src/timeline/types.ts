@@ -114,6 +114,9 @@ export type TimelineProps = {
 	media: MediaItem[];
 	/** bộ lọc màu chung cho mọi clip video / ảnh */
 	filter?: ColorFilter;
+	/** chỉ khi xuất: kích thước file ra (render thẳng ở cỡ nhỏ thay vì render to rồi scale lại) */
+	outWidth?: number;
+	outHeight?: number;
 };
 
 export const timelineDuration = (t: TimelineProps) =>

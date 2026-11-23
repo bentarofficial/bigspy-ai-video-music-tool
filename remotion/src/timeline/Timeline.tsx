@@ -70,7 +70,7 @@ const Visual: React.FC<{c: Clip; frames: number; muted: boolean}> = ({c, frames,
 
 	let media: React.ReactNode;
 	if (c.type === 'image') {
-		media = <Img src={src} style={style} />;
+		media = <Img src={src} style={style} delayRenderTimeoutInMilliseconds={120000} delayRenderRetries={2} />;
 	} else {
 		const v = (
 			<Vid src={src} startFrom={startFrom} playbackRate={speed} volume={vol} muted={vol === 0} style={style} pauseWhenBuffering />
@@ -84,7 +84,7 @@ const Visual: React.FC<{c: Clip; frames: number; muted: boolean}> = ({c, frames,
 		c.bgBlur && (c.fit ?? 'cover') === 'contain' ? (
 			<AbsoluteFill style={{filter: `blur(${c.bgBlur}px) brightness(.7)`, transform: 'scale(1.15)'}}>
 				{c.type === 'image' ? (
-					<Img src={src} style={{...style, objectFit: 'cover'}} />
+					<Img src={src} style={{...style, objectFit: 'cover'}} delayRenderTimeoutInMilliseconds={120000} delayRenderRetries={2} />
 				) : (
 					<Vid src={src} startFrom={startFrom} playbackRate={speed} muted style={{...style, objectFit: 'cover'}} pauseWhenBuffering />
 				)}
@@ -237,13 +237,22 @@ export const Timeline: React.FC<TimelineProps> = (p) => {
 		.filter((c) => byId.has(c.track) && !(byId.get(c.track)!.t.hidden && c.type !== 'audio'))
 		// cùng track: clip sau vẽ sau để chuyển cảnh đè lên clip trước
 		.sort((a, b) => byId.get(b.track)!.i - byId.get(a.track)!.i || a.start - b.start);
+	const body = (
+		<AbsoluteFill style={{backgroundColor: p.background || '#000'}}>
+			{clips.map((c) => (
+				<ClipView key={c.id} c={c} track={byId.get(c.track)!.t} />
+			))}
+		</AbsoluteFill>
+	);
+	// xuất cỡ nhỏ: dựng ở kích thước gốc rồi thu nhỏ bằng CSS -> bố cục y hệt, ít pixel phải chụp hơn
+	const k = p.outWidth ? p.outWidth / p.width : 1;
 	return (
 		<FilterCtx.Provider value={p.filter}>
-			<AbsoluteFill style={{backgroundColor: p.background || '#000'}}>
-				{clips.map((c) => (
-					<ClipView key={c.id} c={c} track={byId.get(c.track)!.t} />
-				))}
-			</AbsoluteFill>
+			{k === 1 ? body : (
+				<div style={{position: 'absolute', width: p.width, height: p.height, transform: `scale(${k})`, transformOrigin: '0 0'}}>
+					{body}
+				</div>
+			)}
 		</FilterCtx.Provider>
 	);
 };

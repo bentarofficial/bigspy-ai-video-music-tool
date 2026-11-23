@@ -748,7 +748,28 @@ async def upload_media(job_id: str, file: UploadFile = File(...)):
 
 EXPORTS = ROOT / "exports"
 CRF = {"low": 28, "medium": 23, "high": 20, "best": 17}
-X264 = {"fast": "veryfast", "balanced": "medium", "small": "slow"}
+X264 = {"fast": "superfast", "balanced": "veryfast", "small": "medium"}
+
+
+def _render_public(d: Path, tl: dict) -> Path:
+    """Thư mục public tối giản chỉ chứa file dự án này dùng (hardlink, không tốn dung lượng).
+    Remotion chép nguyên thư mục public (hàng trăm MB của mọi dự án) mỗi lần render -> rất chậm."""
+    pub = d / "render-public"
+    shutil.rmtree(pub, ignore_errors=True)
+    srcs = {m.get("src") for m in tl.get("media", [])} | {c.get("src") for c in tl.get("clips", [])}
+    root = PUBLIC_DIR.resolve()
+    for src in filter(None, srcs):
+        f = (PUBLIC_DIR / src).resolve()
+        if not isinstance(src, str) or root not in f.parents or not f.is_file():
+            continue
+        dst = pub / src
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.link(f, dst)
+        except OSError:  # khác ổ đĩa / không hỗ trợ hardlink
+            shutil.copy2(f, dst)
+    pub.mkdir(exist_ok=True)
+    return pub
 
 
 def _safe_name(name: str) -> str:
@@ -774,13 +795,19 @@ def export_timeline(job_id: str, body: dict):
     render_tl = dict(tl)
     if int(o.get("fps") or 0) in {24, 25, 30, 50, 60}:
         render_tl["fps"] = int(o["fps"])
+    h = int(o.get("height") or 0)
+    if codec != "mp3" and h and h != min(tl["width"], tl["height"]):
+        # render thẳng ở cỡ đích (cạnh chẵn) -> không phải mã hoá lần 2 bằng ffmpeg
+        k = h / min(tl["width"], tl["height"])
+        render_tl["outWidth"] = max(2, round(tl["width"] * k / 2) * 2)
+        render_tl["outHeight"] = max(2, round(tl["height"] * k / 2) * 2)
     (d / "timeline.render.json").write_text(json.dumps(render_tl, ensure_ascii=False), encoding="utf-8")
 
-    flags = [f"--codec={codec}"]
+    flags = [f"--codec={codec}", "--timeout=120000"]
     if codec != "mp3":
         flags.append(f"--crf={CRF.get(o.get('quality'), 20) + (6 if codec == 'vp8' else 0)}")
         if codec == "h264":
-            flags.append(f"--x264-preset={X264.get(o.get('speed'), 'medium')}")
+            flags.append(f"--x264-preset={X264.get(o.get('speed'), 'veryfast')}")
     if int(o.get("abr") or 0) in {128, 192, 320}:
         flags.append(f"--audio-bitrate={int(o['abr'])}k")
 
@@ -794,19 +821,8 @@ def export_timeline(job_id: str, body: dict):
     log.write(f"\n===== {time.strftime('%H:%M:%S')} Xuất video từ Editor -> {out.name} =====\n")
     log.flush()
     tmp = d / f"export.rendering{ext}"
-    cmd = f'npx remotion render src/index.ts Timeline "{tmp}" --props="{d / "timeline.render.json"}" {" ".join(flags)}'
-    h = int(o.get("height") or 0)
-    short = min(tl["width"], tl["height"])
-    if codec != "mp3" and h and h != short:
-        # --scale của Remotion hay ra kích thước lẻ (1280.06) -> thu nhỏ bằng ffmpeg đi kèm, giữ cạnh chẵn
-        vf = f"scale={'-2:' + str(h) if tl['width'] >= tl['height'] else str(h) + ':-2'}:flags=lanczos"
-        crf = CRF.get(o.get("quality"), 20)
-        venc = {"h264": f"-c:v libx264 -crf {crf} -preset {X264.get(o.get('speed'), 'medium')} -pix_fmt yuv420p",
-                "h265": f"-c:v libx265 -crf {crf + 4} -tag:v hvc1 -pix_fmt yuv420p",
-                "vp8": f"-c:v libvpx -crf {crf + 6} -b:v 0"}[codec]
-        scaled = d / f"export.scaled{ext}"
-        cmd += f' && npx remotion ffmpeg -y -loglevel error -i "{tmp}" -vf "{vf}" {venc} -c:a copy "{scaled}" && move /Y "{scaled}" "{tmp}"'
-    cmd += f' && move /Y "{tmp}" "{out}"'
+    cmd = f'npx remotion render src/index.ts Timeline "{tmp}" --props="{d / "timeline.render.json"}" --public-dir="{_render_public(d, tl)}" {" ".join(flags)}'
+    cmd += f' && move /Y "{tmp}" "{out}" && rmdir /S /Q "{d / "render-public"}"'
 
     if codec == "h264":  # bản H.264 cũng làm video chính của dự án (trang chủ xem/tải được)
         cmd += f' && copy /Y "{out}" "{d / "video.mp4"}"'
@@ -829,6 +845,7 @@ def cleanup_job(job_id: str):
     if status_of(job_id, d) == "running":
         return {"freed": 0}
     freed = 0
+    shutil.rmtree(d / "render-public", ignore_errors=True)
     for pat in CLEANUP_GLOBS:
         for f in d.glob(pat):
             if f.is_file():

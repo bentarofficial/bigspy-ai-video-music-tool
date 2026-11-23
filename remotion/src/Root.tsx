@@ -88,8 +88,8 @@ export const RemotionRoot: React.FC = () => (
 		durationInFrames={30}
 		calculateMetadata={({props}) => ({
 			fps: props.fps,
-			width: props.width,
-			height: props.height,
+			width: props.outWidth ?? props.width,
+			height: props.outHeight ?? props.height,
 			durationInFrames: Math.max(1, Math.ceil(timelineDuration(props) * props.fps)),
 		})}
 	/>
