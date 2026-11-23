@@ -268,7 +268,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
         <div class="inline"><input id="ttSecret" type="password" placeholder="Client Secret" autocomplete="off"><button id="ttSaveSecret">Lưu</button></div>
         <div class="hint">Chưa có key? <a href="https://bentarofficial.github.io/bigspy-ai-video-music-tool/tiktok-guide.html" target="_blank" rel="noopener" style="color:#e68ef0">Xem hướng dẫn lấy key TikTok</a></div></div>
       <button id="ttConnect">Kết nối TikTok</button>
-      <div class="inline" id="ttTagsRow"><input id="ttTags" placeholder="Hashtag mặc định" title="Hashtag tự thêm vào caption"><button class="ghost" id="ttSaveTags">Lưu</button></div>
+      <div id="ttTagsRow"><div class="hint" style="margin-top:9px">Hashtag luôn thêm vào cuối caption (AI tự chọn thêm tag hợp bài):</div><div class="inline" style="margin-top:4px"><input id="ttTags" placeholder="Hashtag luôn thêm, vd: #bentarmusic" title="Hashtag luôn được thêm vào cuối mọi caption (AI tự chọn thêm hashtag hợp bài)"><button class="ghost" id="ttSaveTags">Lưu</button></div></div>
       <button class="ghost danger" id="ttOff">Huỷ kết nối</button>
       <button class="ghost" id="ttReset">Đổi Client Key / Secret</button>
     </div>
@@ -878,7 +878,7 @@ async function tiktokDialog(j) {
   w.innerHTML = `<div class="ttbox"><h3>🎬 Gửi lên TikTok</h3><div class="hint" style="margin:0">Video vào hộp nháp của <b></b>. Bạn hoàn tất và đăng trong app TikTok.</div>
     <textarea id="ttCap" maxlength="2200"></textarea><div class="hint">TikTok không nhận caption qua chế độ hộp nháp — công cụ sẽ chép caption này để bạn dán khi đăng.</div>
     <div class="ttst" hidden></div>
-    <div class="row"><button class="ghost" data-a="close">Đóng</button><button class="ghost" data-a="copy">📋 Chép caption</button><button data-a="send">Gửi lên TikTok</button></div></div>`;
+    <div class="row"><button class="ghost" data-a="close">Đóng</button><button class="ghost" data-a="ai">✨ Viết lại</button><button class="ghost" data-a="copy">📋 Chép caption</button><button data-a="send">Gửi lên TikTok</button></div></div>`;
   w.querySelector('b').textContent = tt.name || 'tài khoản TikTok';
   const cap = w.querySelector('#ttCap'); cap.value = info.caption || '';
   const st = w.querySelector('.ttst'), send = w.querySelector('[data-a=send]');
@@ -898,6 +898,15 @@ async function tiktokDialog(j) {
   if (info.state && Date.now() / 1000 - (info.at || 0) < 86400) { show(info); if (['starting', 'uploading', 'processing'].includes(info.state)) watch(); }
   w.onclick = e => { if (e.target === w) close(); };
   w.querySelector('[data-a=close]').onclick = close;
+  const aiBtn = w.querySelector('[data-a=ai]');
+  const aiWrite = async (again) => {
+    aiBtn.disabled = true; aiBtn.textContent = '✨ AI đang viết…'; cap.disabled = true;
+    try { cap.value = (await api(`/api/jobs/${j.id}/tiktok/caption`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({again})})).caption; }
+    catch (e) { st.hidden = false; st.className = 'ttst err'; st.textContent = '⚠ ' + e.message; }
+    aiBtn.disabled = false; aiBtn.textContent = '✨ Viết lại'; cap.disabled = false;
+  };
+  aiBtn.onclick = () => aiWrite(true);
+  if (!info.saved) aiWrite(false);
   w.querySelector('[data-a=copy]').onclick = async (e) => { if (await copy()) { e.target.textContent = '✓ Đã chép'; setTimeout(() => e.target.textContent = '📋 Chép caption', 1500); } };
   send.onclick = async () => {
     send.disabled = true;

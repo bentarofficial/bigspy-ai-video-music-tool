@@ -959,10 +959,90 @@ def _caption(meta: dict) -> str:
     return f"{title} {os.environ.get('TIKTOK_HASHTAGS', DEFAULT_TAGS)}".strip()
 
 
+CAPTION_PROMPT = """Bạn viết caption TikTok tiếng Việt cho một video nhạc.
+Tên bài: {title}
+Lời bài hát (tham khảo):
+<<<
+{lyrics}
+>>>
+
+Yêu cầu:
+- Viết 1–2 câu ngắn (tổng dưới 150 ký tự), cảm xúc, tự nhiên như người thật đăng TikTok.
+- Lấy ý từ tên bài và tinh thần lời bài hát, KHÔNG chép nguyên câu nào trong lời.
+- Có thể dùng 1 emoji hợp cảm xúc. Không bao caption trong dấu ngoặc kép.
+- Chọn thêm 3–5 hashtag hợp tâm trạng bài (tiếng Việt không dấu hoặc tiếng Anh, vd: #nhactamtrang #hoainiem #chill).
+{variant}
+Chỉ trả về JSON một dòng: {{"caption": "...", "hashtags": ["#a", "#b"]}}"""
+
+
+def _lyrics_text(d: Path) -> str:
+    """Lời bài: lời người dùng dán / lời research được / phụ đề trong timeline / props."""
+    for name in ("lyrics_input.txt", "lyrics_reference.txt"):
+        f = d / name
+        if f.exists():
+            lines = f.read_text(encoding="utf-8", errors="replace").splitlines()
+            text = "\n".join(l for l in lines if not l.startswith("#")).strip()
+            if text:
+                return text
+    for name in ("timeline.json", "props.json"):
+        try:
+            data = json.loads((d / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if name == "timeline.json":
+            lines = [ln for c in data.get("clips", []) if c.get("type") == "lyrics" for ln in c.get("lines", [])]
+        else:
+            lines = data.get("lines") or []
+        text = "\n".join(" ".join(w.get("text", "") for w in ln.get("words", [])) for ln in lines).strip()
+        if text:
+            return text
+    return ""
+
+
+def _merge_tags(*groups) -> str:
+    seen, out = set(), []
+    for g in groups:
+        for t in (g.split() if isinstance(g, str) else g):
+            t = "#" + re.sub(r"[^\w]", "", str(t).lstrip("#"))
+            if len(t) > 1 and t.lower() not in seen:
+                seen.add(t.lower())
+                out.append(t)
+    return " ".join(out)
+
+
+@app.post("/api/jobs/{job_id}/tiktok/caption")
+def ai_caption(job_id: str, body: dict | None = None):
+    """AI viết 1–2 câu caption + hashtag từ tên bài và lời; luôn nối thêm hashtag cố định trong Cài đặt."""
+    from musicvideo import llm
+    d = job_dir(job_id)
+    meta = read_meta(d)
+    if not llm.available():
+        raise HTTPException(400, "Chưa kết nối Claude CLI hay Codex CLI (Cài đặt → Kết nối) nên AI chưa viết được caption.")
+    title = re.sub(r"\.(wav|mp3|m4a|flac|ogg|aac)$", "", meta.get("title") or "", flags=re.I).strip()
+    title = re.sub(r"\s*\(\d+s\)$", "", title)
+    variant = "Viết một phiên bản KHÁC hẳn (góc nhìn, cảm xúc khác)." if (body or {}).get("again") else ""
+    prompt = CAPTION_PROMPT.format(title=title or "(không rõ)", lyrics=_lyrics_text(d)[:1500] or "(không có lời)",
+                                   variant=variant)
+    try:
+        out = llm.ask(prompt, effort="low", timeout=180)
+    except Exception as e:
+        raise HTTPException(500, f"AI lỗi: {e}")
+    m = re.search(r"\{.*\}", out, re.S)
+    try:
+        data = json.loads(m.group(0)) if m else {}
+    except ValueError:
+        data = {}
+    cap = str(data.get("caption") or "").strip().strip('"').strip()
+    if not cap:
+        raise HTTPException(500, "AI trả lời không đúng định dạng — bấm Viết lại.")
+    tags = _merge_tags(data.get("hashtags") or [], os.environ.get("TIKTOK_HASHTAGS", DEFAULT_TAGS))
+    return {"caption": f"{cap}\n\n{tags}"}
+
+
 @app.get("/api/jobs/{job_id}/tiktok")
 def job_tiktok(job_id: str):
     meta = read_meta(job_dir(job_id))
-    return {**(meta.get("tiktok") or {}), "caption": meta.get("caption") or _caption(meta)}
+    return {**(meta.get("tiktok") or {}), "caption": meta.get("caption") or _caption(meta), "saved": bool(meta.get("caption"))}
 
 
 @app.post("/api/jobs/{job_id}/tiktok")
