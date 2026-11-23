@@ -648,7 +648,20 @@ function rowHTML(f, v) {
   else ctl = `<input type="text" value="${esc(v ?? '')}" data-k="${f.key}">`;
   return `<div class="row"><label for="${id}">${f.label}</label><div class="ctl">${ctl}</div></div>`;
 }
-function groupHTML(title, fields, obj) { return `<h4>${title}</h4>` + fields.map((f) => rowHTML(f, getK(obj, f.key))).join(''); }
+function groupHTML(title, fields, obj) { return `<h4>${title}</h4>` + fields.map((f) => rowHTML(f, f.val !== undefined ? f.val : getK(obj, f.key))).join(''); }
+// kiểu phụ đề = mode + số chữ hiện trước (lookahead)
+const SUB_KINDS = [['karaoke', 'Karaoke (cả câu, tô màu khi hát)'], ['p0', 'Hát đến đâu hiện đến đó'], ['p1', 'Hiện trước 1 chữ'], ['p2', 'Hiện trước 2 chữ'],
+  ['p3', 'Hiện trước 3 chữ'], ['p4', 'Hiện trước 4 chữ'], ['p5', 'Hiện trước 5 chữ'], ['p6', 'Hiện trước 6 chữ'], ['full', 'Cả câu + câu sau (mờ)']];
+function subKindOf(s = {}) { return s.mode === 'preview' ? 'p' + Math.max(0, Math.min(6, Math.round(s.lookahead ?? 2))) : (s.mode || 'karaoke'); }
+function setSubKind(c, kind) {
+  c.subtitle ??= {...DEF_SUB};
+  if (kind[0] === 'p') { c.subtitle.mode = 'preview'; c.subtitle.lookahead = +kind.slice(1); } else c.subtitle.mode = kind;
+}
+function subKindFields(c) {
+  const s = c?.subtitle || DEF_SUB, f = [field('Kiểu', 'subtitle._kind', 'select', {opts: SUB_KINDS, val: subKindOf(s)})];
+  if (s.mode === 'preview') f.push(field('Hiện trước (chữ)', 'subtitle.lookahead', 'range', {min: 0, max: 6, step: 1, val: s.lookahead ?? 2}));
+  return f;
+}
 
 function renderProps() {
   const box = $('#props');
@@ -751,7 +764,7 @@ function renderProps() {
   ], c) + `<div class="btnrow"><button class="ghost" data-do="cover-all">⛶ Phủ cả khung</button><button class="ghost" data-do="cover-full">↔ Kéo dài hết video</button></div>
     <p class="hint">Kéo khung trên màn hình xem trước để di chuyển, chấm góc để đổi kích thước. Dùng để che phụ đề / logo có sẵn trong clip.</p>`;
   if (c.type === 'lyrics') h += groupHTML('Phụ đề lời bài hát', [
-    field('Kiểu', 'subtitle.mode', 'select', {opts: [['karaoke', 'Karaoke (tô màu)'], ['preview', 'Hiện dần từng chữ'], ['full', 'Cả câu']]}),
+    ...subKindFields(c),
     field('Phông', 'subtitle.fontFamily', 'select', {opts: FONTS.map((f) => [f, f.split(',')[0]])}),
     field('Cỡ chữ', 'subtitle.fontSize', 'range', {min: 12, max: 200, step: 1}),
     field('Màu chữ', 'subtitle.color', 'color'), field('Màu tô', 'subtitle.highlightColor', 'color'),
@@ -1006,7 +1019,7 @@ function renderSide(force) {
     const ly = TL.clips.filter((c) => c.type === 'lyrics');
     if (!ly.length) h = `<p class="hint">Chưa có câu lời nào. Bấm <b>＋ Câu lời</b> trên thanh công cụ để thêm.</p>`;
     else h = `<h3>Kiểu phụ đề <span class="badge">${ly.length} câu</span></h3>` + groupHTML('Chữ', [
-      field('Kiểu', 'subtitle.mode', 'select', {opts: [['karaoke', 'Karaoke (tô màu)'], ['preview', 'Hiện dần từng chữ'], ['full', 'Cả câu']]}),
+      ...subKindFields(ly[0]),
       field('Phông', 'subtitle.fontFamily', 'select', {opts: FONTS.map((f) => [f, f.split(',')[0]])}),
       field('Cỡ chữ', 'subtitle.fontSize', 'range', {min: 12, max: 200, step: 1}),
       field('Viết hoa', 'subtitle.uppercase', 'check'),
@@ -1070,6 +1083,8 @@ function bindSide() {
     const el = e.target, sp = el.parentElement.querySelector('.vpct');
     if (el.dataset.k?.startsWith('subtitle.')) {
       let v = el.type === 'checkbox' ? el.checked : el.value; if (el.dataset.n !== undefined) v = parseFloat(v);
+      if (el.dataset.k === 'subtitle._kind') { TL.clips.forEach((c) => { if (c.type === 'lyrics') setSubKind(c, v); }); live(final); return setTimeout(() => renderSide(true), 0); }
+      if (el.dataset.k === 'subtitle.lookahead') v = Math.round(v);
       TL.clips.forEach((c) => { if (c.type === 'lyrics') { c.subtitle ??= {...DEF_SUB}; setK(c, el.dataset.k, v); } });
       $$(`[data-k="${el.dataset.k}"]`, el.closest('.rbody')).forEach((x) => { if (x !== el && x.type !== 'checkbox') x.value = v; });
       return live(final);
@@ -1143,8 +1158,12 @@ function bindProps() {
         const old = c.speed || 1; c.dur = q(c.dur * old / v);
       }
       if (k === 'dur' && hasSrcLimit(c)) v = Math.min(v, (c.srcDur - (c.in || 0)) / (c.speed || 1));
-      setK(c, k, v);
-      if (k.startsWith('subtitle.')) TL.clips.forEach((x) => { if (x.type === 'lyrics' && x !== c) setK(x, k, v); });
+      if (k === 'subtitle._kind') TL.clips.forEach((x) => { if (x.type === 'lyrics') setSubKind(x, v); });
+      else {
+        if (k === 'subtitle.lookahead') v = Math.round(v);
+        setK(c, k, v);
+        if (k.startsWith('subtitle.')) TL.clips.forEach((x) => { if (x.type === 'lyrics' && x !== c) setK(x, k, v); });
+      }
       if (k === 'transition.type' && c.transition.dur == null) c.transition.dur = 0.5;
       if (k === 'transition.dur' && !c.transition.type) c.transition.type = 'fade';
       if (k === 'title.text') c.name = v.split('\n')[0];
