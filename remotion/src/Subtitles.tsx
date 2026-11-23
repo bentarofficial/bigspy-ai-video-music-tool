@@ -11,21 +11,73 @@ type W = Line['words'][number];
 /** Một chữ: lớp màu thường + lớp màu highlight được "quét" từ trái sang phải theo tiến độ hát. */
 const ease = (x: number) => x * x * (3 - 2 * x); // smoothstep
 
-const Word: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, number] | null; wfx?: Fx}> = ({w, t, s, reveal, wfx}) => {
+const easeOut = (x: number) => 1 - Math.pow(1 - x, 3); // ease-out cubic: nhanh lúc đầu, đáp rất êm
+const ramp = (t: number, from: number, dur: number) => easeOut(interpolate(t, [from, from + dur], [0, 1], clamp));
+
+/** Kiểu chill (chữ chảy / sáng dần / sương mờ): hiệu ứng chạy theo TỪNG KÝ TỰ, ký tự sau trễ hơn ký tự trước
+ *  -> mắt thấy một dòng chảy liên tục thay vì từng chữ bật ra (giống cách CapCut làm). */
+const CharWord: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, number] | null; wfx?: Fx}> = ({w, t, s, reveal, wfx}) => {
+	const text = (s.uppercase ? w.text.toUpperCase() : w.text).normalize('NFC');
+	const chars = Array.from(text);
+	const n = chars.length || 1;
+	const dw = Math.max(w.end - w.start, 0.15);
+	const stroke: React.CSSProperties = {WebkitTextStroke: `${s.strokeWidth}px ${s.strokeColor}`, paintOrder: 'stroke fill'};
+	return (
+		<span
+			style={{
+				display: 'inline-block',
+				whiteSpace: 'nowrap',
+				margin: `0 ${s.fontSize * 0.14}px`,
+				transform: wfx ? fxTransform(wfx) : undefined,
+				opacity: wfx ? wfx.opacity : 1,
+				filter: wfx?.blur ? `blur(${wfx.blur}px)` : undefined,
+			}}
+		>
+			{chars.map((ch, j) => {
+				const f = j / n;
+				let k = 1, op = 1, blur = 0, ty = 0, sc = 1, glow = 0, sung = 0;
+				if (s.mode === 'preview' && reveal) {
+					const [a, b] = reveal;
+					k = ramp(t, a + (b - a) * f * 0.85, Math.max(0.3, (b - a) * 0.55));
+					op = k; blur = (1 - k) * 5; ty = (1 - k) * 0.14;
+					sung = ramp(t, w.start + dw * f, 0.22);
+				} else if (s.mode === 'glow') {
+					k = ramp(t, w.start + dw * f - 0.05, 0.55);
+					op = 0.4 + 0.6 * k; glow = k;
+				} else if (s.mode === 'mist') {
+					k = ramp(t, w.start + dw * f - 0.3, 0.8);
+					op = k; blur = (1 - k) * 9; sc = 1 + (1 - k) * 0.18;
+				}
+				return (
+					<span
+						key={j}
+						style={{
+							position: 'relative',
+							display: 'inline-block',
+							opacity: op,
+							transform: ty || sc !== 1 ? `translateY(${ty}em) scale(${sc})` : undefined,
+							filter: blur > 0.05 ? `blur(${blur}px)` : undefined,
+							textShadow: glow > 0.01 ? `0 0 ${s.fontSize * 0.25 * glow}px ${s.highlightColor}` : undefined,
+						}}
+					>
+						<span style={{color: s.color, ...stroke}}>{ch}</span>
+						{sung > 0.01 ? (
+							<span style={{position: 'absolute', left: 0, top: 0, color: s.highlightColor, opacity: sung, ...stroke}}>{ch}</span>
+						) : null}
+					</span>
+				);
+			})}
+		</span>
+	);
+};
+
+const Word: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, number] | null; wfx?: Fx}> = (props) => {
+	const {w, t, s, wfx} = props;
+	if (s.mode === 'preview' || s.mode === 'glow' || s.mode === 'mist') return <CharWord {...props} />;
 	const progress = interpolate(t, [w.start, Math.max(w.end, w.start + 0.05)], [0, 1], clamp);
-	// phong cách chill: không bật/tắt, không nhảy — mọi thay đổi đều chậm và mềm
-	const r = reveal ? ease(interpolate(t, reveal, [0, 1], clamp)) : 1; // preview: chữ chảy ra từ trái sang phải
 	const hump = t >= w.start && t <= w.end ? Math.sin(Math.PI * progress) : 0;
 	const scale = s.mode === 'karaoke' ? 1 + 0.05 * hump : 1; // karaoke: phồng rất nhẹ, lên xuống êm
-	// glow (Sáng dần): cả câu mờ sẵn, hát tới đâu chữ sáng lên chậm rãi tới đó
-	const glow = s.mode === 'glow';
-	const lit = glow ? ease(interpolate(t, [w.start - 0.1, w.start + 0.6], [0, 1], clamp)) : 1;
-	// mist (Sương mờ): chữ hiện ra từ làn sương — nhoè + giãn chữ rồi tụ lại, không di chuyển
-	const mist = s.mode === 'mist' ? ease(interpolate(t, [w.start - 0.35, w.start + 0.55], [0, 1], clamp)) : 1;
-	const sweep = !glow && s.mode !== 'mist'; // 2 kiểu chill không quét màu tô
 	const text = s.uppercase ? w.text.toUpperCase() : w.text;
-	const mask = r < 1 ? `linear-gradient(90deg, #000 ${r * 160 - 60}%, transparent ${r * 160}%)` : undefined;
-	const blur = (1 - r) * 4 + (1 - mist) * 10;
 	const stroke: React.CSSProperties = {
 		WebkitTextStroke: `${s.strokeWidth}px ${s.strokeColor}`,
 		paintOrder: 'stroke fill',
@@ -36,14 +88,9 @@ const Word: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, number
 				position: 'relative',
 				display: 'inline-block',
 				margin: `0 ${s.fontSize * 0.14}px`,
-				transform: `${wfx ? fxTransform(wfx) + ' ' : ''}translateY(${(1 - r) * s.fontSize * 0.06}px) scale(${scale})`,
-				filter: wfx?.blur ? `blur(${wfx.blur}px)` : blur > 0.05 ? `blur(${blur}px)` : undefined,
-				opacity: (reveal ? Math.min(1, r * 1.4) : 1) * (glow ? 0.4 + 0.6 * lit : 1) * mist * (wfx ? wfx.opacity : 1),
-				letterSpacing: mist < 1 ? `${(1 - mist) * 0.12}em` : undefined,
-				textShadow: glow && lit > 0 ? `0 0 ${s.fontSize * 0.25 * lit}px ${s.highlightColor}` : undefined,
-				WebkitMaskImage: mask,
-				maskImage: mask,
-				transition: 'none',
+				transform: `${wfx ? fxTransform(wfx) + ' ' : ''}scale(${scale})`,
+				filter: wfx?.blur ? `blur(${wfx.blur}px)` : undefined,
+				opacity: wfx ? wfx.opacity : 1,
 			}}
 		>
 			<span style={{color: s.color, ...stroke}}>{text}</span>
@@ -55,7 +102,6 @@ const Word: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, number
 					color: s.highlightColor,
 					...stroke,
 					clipPath: `inset(-20% ${100 - progress * 100}% -20% -5%)`,
-						display: sweep ? undefined : 'none',
 				}}
 			>
 				{text}
