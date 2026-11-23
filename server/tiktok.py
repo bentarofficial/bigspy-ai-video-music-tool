@@ -23,7 +23,7 @@ SCOPES = "user.info.basic,video.upload"
 API = "https://open.tiktokapis.com/v2"
 
 router = APIRouter()
-_pending: dict[str, tuple[str, str, float]] = {}  # state -> (code_verifier, redirect_uri, lúc tạo)
+PENDING_FILE = ROOT / ".cache" / "tiktok_oauth.json"  # state -> [code_verifier, redirect_uri, lúc tạo]; giữ qua lần khởi động lại
 _lock = threading.Lock()
 
 
@@ -33,6 +33,20 @@ def client_key() -> str:
 
 def client_secret() -> str:
     return os.environ.get("TIKTOK_CLIENT_SECRET", "").strip()
+
+
+def _pending_load() -> dict:
+    try:
+        d = json.loads(PENDING_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    now = time.time()
+    return {k: v for k, v in d.items() if now - v[2] < 1800}
+
+
+def _pending_save(d: dict) -> None:
+    PENDING_FILE.parent.mkdir(parents=True, exist_ok=True)
+    PENDING_FILE.write_text(json.dumps(d), encoding="utf-8")
 
 
 # ---------- token ----------
@@ -137,10 +151,10 @@ def auth_url(request: Request):
     redirect = f"http://127.0.0.1:{port}/tiktok/callback/"
     verifier = secrets.token_urlsafe(64)[:96]
     state = secrets.token_urlsafe(16)
-    now = time.time()
-    for k in [k for k, v in _pending.items() if now - v[2] > 900]:
-        _pending.pop(k, None)
-    _pending[state] = (verifier, redirect, now)
+    with _lock:
+        pend = _pending_load()
+        pend[state] = [verifier, redirect, time.time()]
+        _pending_save(pend)
     q = {"client_key": client_key(), "response_type": "code", "scope": SCOPES, "redirect_uri": redirect,
          "state": state, "code_challenge": hashlib.sha256(verifier.encode()).hexdigest(), "code_challenge_method": "S256"}
     return {"url": "https://www.tiktok.com/v2/auth/authorize/?" + urlencode(q)}
@@ -157,11 +171,14 @@ def _page(title: str, msg: str, ok: bool) -> HTMLResponse:
 
 @router.get("/tiktok/callback/")
 def callback(state: str = "", code: str = "", error: str = "", error_description: str = ""):
-    pend = _pending.pop(state, None)
+    with _lock:
+        allp = _pending_load()
+        pend = allp.pop(state, None)
+        _pending_save(allp)
     if error:
         return _page("Chưa kết nối", error_description or error, False)
     if not pend or not code:
-        return _page("Chưa kết nối", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Hãy bấm Kết nối TikTok lại.", False)
+        return _page("Chưa kết nối", "Phiên đăng nhập không khớp hoặc đã quá 30 phút (có thể do bấm Continue ở một tab TikTok cũ). Đóng các tab TikTok cũ, rồi trong công cụ bấm Kết nối TikTok lại.", False)
     verifier, redirect, _ = pend
     try:
         data = _oauth({"code": code, "grant_type": "authorization_code", "redirect_uri": redirect, "code_verifier": verifier})
