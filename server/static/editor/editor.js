@@ -650,16 +650,17 @@ function rowHTML(f, v) {
 }
 function groupHTML(title, fields, obj) { return `<h4>${title}</h4>` + fields.map((f) => rowHTML(f, f.val !== undefined ? f.val : getK(obj, f.key))).join(''); }
 // kiểu phụ đề = mode + số chữ hiện trước (lookahead)
-const SUB_KINDS = [['karaoke', 'Karaoke (cả câu, tô màu khi hát)'], ['p0', 'Hát đến đâu hiện đến đó'], ['p1', 'Hiện trước 1 chữ'], ['p2', 'Hiện trước 2 chữ'],
-  ['p3', 'Hiện trước 3 chữ'], ['p4', 'Hiện trước 4 chữ'], ['p5', 'Hiện trước 5 chữ'], ['p6', 'Hiện trước 6 chữ'], ['full', 'Cả câu + câu sau (mờ)']];
-function subKindOf(s = {}) { return s.mode === 'preview' ? 'p' + Math.max(0, Math.min(6, Math.round(s.lookahead ?? 2))) : (s.mode || 'karaoke'); }
+const SUB_KINDS = [['glow', 'Sáng dần (chill) – cả câu mờ, hát tới đâu sáng tới đó'], ['mist', 'Sương mờ (chill) – chữ hiện ra từ làn sương'],
+  ['p0', 'Chữ chảy (chill) – hát đến đâu hiện đến đó'], ['preview', 'Hiện trước vài chữ (chỉnh số chữ)'], ['karaoke', 'Karaoke – tô màu khi hát'], ['full', 'Cả câu + câu sau (mờ)']];
+function subKindOf(s = {}) { return s.mode === 'preview' ? (Math.round(s.lookahead ?? 2) > 0 ? 'preview' : 'p0') : (s.mode || 'karaoke'); }
 function setSubKind(c, kind) {
   c.subtitle ??= {...DEF_SUB};
-  if (kind[0] === 'p') { c.subtitle.mode = 'preview'; c.subtitle.lookahead = +kind.slice(1); } else c.subtitle.mode = kind;
+  if (kind === 'p0') { c.subtitle.mode = 'preview'; c.subtitle.lookahead = 0; }
+  else { c.subtitle.mode = kind; if (kind === 'preview' && !(c.subtitle.lookahead > 0)) c.subtitle.lookahead = 2; }
 }
 function subKindFields(c) {
   const s = c?.subtitle || DEF_SUB, f = [field('Kiểu', 'subtitle._kind', 'select', {opts: SUB_KINDS, val: subKindOf(s)})];
-  if (s.mode === 'preview') f.push(field('Hiện trước (chữ)', 'subtitle.lookahead', 'range', {min: 0, max: 6, step: 1, val: s.lookahead ?? 2}));
+  if (subKindOf(s) === 'preview') f.push(field('Số chữ hiện trước', 'subtitle.lookahead', 'range', {min: 1, max: 6, step: 1, val: s.lookahead ?? 2}));
   return f;
 }
 

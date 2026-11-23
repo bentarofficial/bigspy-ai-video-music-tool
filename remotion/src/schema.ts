@@ -20,8 +20,8 @@ export const sceneSchema = z.object({
 });
 
 export const subtitleSchema = z.object({
-	/** karaoke: tô màu chữ đang hát | preview: hiện trước N chữ | full: hiện cả câu + câu kế tiếp */
-	mode: z.enum(['karaoke', 'preview', 'full']),
+	/** karaoke: tô màu chữ đang hát | preview: hiện trước N chữ | full: hiện cả câu + câu kế tiếp | glow: hát tới đâu sáng dần tới đó | mist: chữ hiện ra từ sương mờ */
+	mode: z.enum(['karaoke', 'preview', 'full', 'glow', 'mist']),
 	lookahead: z.number().int().min(0).max(6),
 	leadIn: z.number().min(0).max(3),
 	fontFamily: z.string(),

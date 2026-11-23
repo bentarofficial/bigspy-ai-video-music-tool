@@ -9,19 +9,23 @@ const HOLD = 0.4; // giữ câu thêm chút sau chữ cuối
 type W = Line['words'][number];
 
 /** Một chữ: lớp màu thường + lớp màu highlight được "quét" từ trái sang phải theo tiến độ hát. */
-const Word: React.FC<{w: W; t: number; s: SubtitleStyle; visible: boolean; appearAt: number; wfx?: Fx}> = ({
-	w,
-	t,
-	s,
-	visible,
-	appearAt,
-	wfx,
-}) => {
+const ease = (x: number) => x * x * (3 - 2 * x); // smoothstep
+
+const Word: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, number] | null; wfx?: Fx}> = ({w, t, s, reveal, wfx}) => {
 	const progress = interpolate(t, [w.start, Math.max(w.end, w.start + 0.05)], [0, 1], clamp);
-	const active = t >= w.start && t < w.end;
-	const pop = interpolate(t, [appearAt, appearAt + 0.18], [0, 1], clamp);
-	const scale = (active ? 1.08 : 1) * (s.mode === 'preview' ? 0.6 + 0.4 * pop : 1);
+	// phong cách chill: không bật/tắt, không nhảy — mọi thay đổi đều chậm và mềm
+	const r = reveal ? ease(interpolate(t, reveal, [0, 1], clamp)) : 1; // preview: chữ chảy ra từ trái sang phải
+	const hump = t >= w.start && t <= w.end ? Math.sin(Math.PI * progress) : 0;
+	const scale = s.mode === 'karaoke' ? 1 + 0.05 * hump : 1; // karaoke: phồng rất nhẹ, lên xuống êm
+	// glow (Sáng dần): cả câu mờ sẵn, hát tới đâu chữ sáng lên chậm rãi tới đó
+	const glow = s.mode === 'glow';
+	const lit = glow ? ease(interpolate(t, [w.start - 0.1, w.start + 0.6], [0, 1], clamp)) : 1;
+	// mist (Sương mờ): chữ hiện ra từ làn sương — nhoè + giãn chữ rồi tụ lại, không di chuyển
+	const mist = s.mode === 'mist' ? ease(interpolate(t, [w.start - 0.35, w.start + 0.55], [0, 1], clamp)) : 1;
+	const sweep = !glow && s.mode !== 'mist'; // 2 kiểu chill không quét màu tô
 	const text = s.uppercase ? w.text.toUpperCase() : w.text;
+	const mask = r < 1 ? `linear-gradient(90deg, #000 ${r * 160 - 60}%, transparent ${r * 160}%)` : undefined;
+	const blur = (1 - r) * 4 + (1 - mist) * 10;
 	const stroke: React.CSSProperties = {
 		WebkitTextStroke: `${s.strokeWidth}px ${s.strokeColor}`,
 		paintOrder: 'stroke fill',
@@ -32,9 +36,13 @@ const Word: React.FC<{w: W; t: number; s: SubtitleStyle; visible: boolean; appea
 				position: 'relative',
 				display: 'inline-block',
 				margin: `0 ${s.fontSize * 0.14}px`,
-				transform: `${wfx ? fxTransform(wfx) + ' ' : ''}scale(${scale})`,
-				filter: wfx?.blur ? `blur(${wfx.blur}px)` : undefined,
-				opacity: (visible ? (s.mode === 'preview' ? pop : 1) : 0) * (wfx ? wfx.opacity : 1),
+				transform: `${wfx ? fxTransform(wfx) + ' ' : ''}translateY(${(1 - r) * s.fontSize * 0.06}px) scale(${scale})`,
+				filter: wfx?.blur ? `blur(${wfx.blur}px)` : blur > 0.05 ? `blur(${blur}px)` : undefined,
+				opacity: (reveal ? Math.min(1, r * 1.4) : 1) * (glow ? 0.4 + 0.6 * lit : 1) * mist * (wfx ? wfx.opacity : 1),
+				letterSpacing: mist < 1 ? `${(1 - mist) * 0.12}em` : undefined,
+				textShadow: glow && lit > 0 ? `0 0 ${s.fontSize * 0.25 * lit}px ${s.highlightColor}` : undefined,
+				WebkitMaskImage: mask,
+				maskImage: mask,
 				transition: 'none',
 			}}
 		>
@@ -47,6 +55,7 @@ const Word: React.FC<{w: W; t: number; s: SubtitleStyle; visible: boolean; appea
 					color: s.highlightColor,
 					...stroke,
 					clipPath: `inset(-20% ${100 - progress * 100}% -20% -5%)`,
+						display: sweep ? undefined : 'none',
 				}}
 			>
 				{text}
@@ -75,18 +84,13 @@ const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: numbe
 	// cả câu: hiệu ứng vào/ra (chưa chọn hiệu ứng = kiểu cũ: mờ dần + trồi nhẹ)
 	const fx = noFx();
 	if (!animIn) {
-		fx.opacity = interpolate(t, [shownAt, shownAt + 0.2], [0, 1], clamp);
+		fx.opacity = interpolate(t, [shownAt, shownAt + 0.45], [0, 1], clamp);
 		fx.ty = interpolate(fx.opacity, [0, 1], [20, 0]);
 	} else if (!perWord) applyIn(fx, animIn, fIn, inF, fps, D);
 	applyOut(fx, animOut, rOut, outF, D);
 	const opacity = fx.opacity;
 	const stagger = Math.max(1, Math.round(fps * 0.07));
 	const wordFx = (i: number) => (perWord ? applyIn(noFx(), {'word-pop': 'pop', 'word-rise': 'rise', 'word-fade': 'fade'}[animIn!] ?? 'fade', fIn - i * stagger, inF, fps, D) : undefined);
-	// chỉ số chữ đang/đã hát gần nhất
-	let current = -1;
-	line.words.forEach((w, i) => {
-		if (t >= w.start) current = i;
-	});
 	return (
 		<div
 			style={{
@@ -105,11 +109,20 @@ const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: numbe
 			}}
 		>
 			{line.words.map((w, i) => {
-				// preview: chỉ hiện các chữ đã hát + N chữ kế tiếp
-				const visible = s.mode !== 'preview' || i <= current + s.lookahead;
-				const trigger = i - s.lookahead - 1;
-				const appearAt = trigger < 0 ? shownAt : line.words[trigger].start;
-				return <Word key={i} w={w} t={dim ? -1 : t} s={s} visible={visible} appearAt={appearAt} wfx={wordFx(i)} />;
+				// preview: chữ i lộ dần trong lúc chữ (i - N) đang được hát -> dòng chữ chảy liên tục
+				let reveal: [number, number] | null = null;
+				if (s.mode === 'preview') {
+					const k = i - s.lookahead;
+					if (k < 0) reveal = [shownAt, shownAt + 0.6];
+					else {
+						const src = line.words[k];
+						const a = src.start - 0.06;
+						const nx = line.words[k + 1];
+						const b = Math.max(a + 0.4, Math.min(nx ? nx.start : src.end, src.end + 0.1, a + 0.9));
+						reveal = [a, b];
+					}
+				}
+				return <Word key={i} w={w} t={dim ? -1 : t} s={s} reveal={reveal} wfx={wordFx(i)} />;
 			})}
 		</div>
 	);
