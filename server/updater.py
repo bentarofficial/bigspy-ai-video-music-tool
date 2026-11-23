@@ -104,7 +104,15 @@ def apply() -> dict:
             dst = ROOT / rel
             dst.parent.mkdir(parents=True, exist_ok=True)
             _write(z, m, dst)
-    # Khởi động lại qua `start` để tiến trình mới không nằm trong cây tiến trình của server (stop.ps1 kill cả cây).
-    subprocess.Popen(f'cmd /c start "" /min powershell -NoProfile -ExecutionPolicy Bypass -File '
-                     f'"{ROOT / "scripts" / "restart.ps1"}"', shell=True, cwd=ROOT)
+    # Không dùng taskkill /T khi restart: nó sẽ giết luôn script con trước khi server mới chạy.
+    log_path = ROOT / "logs" / "restart.log"
+    log_path.parent.mkdir(exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as log:
+        subprocess.Popen(
+            [shutil.which("powershell") or "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+             "-File", str(ROOT / "scripts" / "restart.ps1")],
+            cwd=ROOT, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0) |
+                          getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+        )
     return {"ok": True, "message": f"Đã cập nhật lên {info['latest']}, đang khởi động lại…", **info}
