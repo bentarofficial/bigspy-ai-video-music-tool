@@ -7,6 +7,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
+from musicvideo.config import CACHE_DIR
+
 REPO = "bentarofficial/bigspy-ai-video-music-tool"
 ASSET = "app-update.zip"
 ROOT = Path(__file__).resolve().parent.parent
@@ -88,7 +90,7 @@ def apply() -> dict:
     info = _check()
     if not info["available"]:
         return {"ok": False, "message": "Đang dùng bản mới nhất.", **info}
-    stage = ROOT / ".cache" / "update"
+    stage = CACHE_DIR / "update"
     shutil.rmtree(stage, ignore_errors=True)
     stage.mkdir(parents=True)
     zpath = stage / ASSET

@@ -19,16 +19,20 @@ if (Test-Path $pidFile) {
 
 if (-not $running) {
     $env:PYTHONIOENCODING = 'utf-8'
-    $proc = Start-Process -FilePath 'python' `
+    $pythonExe = & (Join-Path $PSScriptRoot 'find-python.ps1')
+    $proc = Start-Process -FilePath $pythonExe `
         -ArgumentList '-m', 'uvicorn', 'server.app:app', '--host', '127.0.0.1', '--port', "$port" `
         -WorkingDirectory $root -WindowStyle Hidden -PassThru `
         -RedirectStandardOutput (Join-Path $root 'logs\server.log') `
         -RedirectStandardError (Join-Path $root 'logs\server.err.log')
     $proc.Id | Out-File -Encoding ascii $pidFile
+    $ready = $false
     for ($i = 0; $i -lt 40; $i++) {
-        try { Invoke-WebRequest "$url/api/health" -UseBasicParsing -TimeoutSec 1 | Out-Null; break }
+        if ($proc.HasExited) { break }
+        try { Invoke-WebRequest "$url/api/health" -UseBasicParsing -TimeoutSec 1 | Out-Null; $ready = $true; break }
         catch { Start-Sleep -Milliseconds 500 }
     }
+    if (-not $ready) { throw "Server khong khoi dong duoc. Xem logs\server.err.log" }
 }
 if ($NoWindow) { exit }
 # Lưu ý: PowerShell không phân biệt hoa/thường -> không đặt tên trùng tham số $Browser.
