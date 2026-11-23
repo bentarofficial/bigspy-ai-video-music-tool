@@ -67,6 +67,13 @@ aside{background:rgba(12,12,14,.75);backdrop-filter:blur(20px);border-right:1px 
 .jmenu{position:fixed;z-index:50;min-width:150px;padding:4px;border-radius:10px;background:#1f1f23;border:1px solid var(--line);box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .jmenu button{display:block;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:7px;background:transparent;color:var(--text);font:inherit;font-size:13px;cursor:pointer}
 .jmenu button:hover{background:rgba(255,255,255,.06)}.jmenu button.danger{color:var(--err)}
+.ttav{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none}
+.ttmodal{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:16px}
+.ttbox{width:min(480px,100%);background:#151518;border:1px solid var(--line2);border-radius:16px;padding:18px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.ttbox h3{margin:0 0 4px;font-size:16px}.ttbox textarea{min-height:90px;margin-top:10px;resize:vertical}
+.ttbox .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}.ttbox .row button{padding:8px 14px}
+.ttst{margin-top:12px;font-size:13px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.ttst.ok{color:var(--ok)}.ttst.err{color:var(--err)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dim)}
 .dot.done{background:var(--ok)}.dot.error{background:var(--err)}.dot.running{background:var(--warn);box-shadow:0 0 0 0 rgba(255,255,255,.6);animation:pulse 1.4s infinite}
 @keyframes pulse{70%{box-shadow:0 0 0 7px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
@@ -254,6 +261,16 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
     <div class="svc" id="svcCodex">
       <div class="svc-top"><span class="svc-ic">🤖</span><div class="svc-name"><b>ChatGPT Codex CLI</b><small id="k3"></small></div><span class="pill" id="cxPill"></span></div>
       <button class="ghost" id="cxToggle"></button>
+    </div>
+    <div class="svc" id="svcTT">
+      <div class="svc-top"><span class="svc-ic" id="ttIc">🎬</span><div class="svc-name"><b>TikTok</b><small id="ttSub"></small></div><span class="pill" id="ttPill"></span></div>
+      <div id="ttSecretForm"><input id="ttKey" placeholder="Client Key" autocomplete="off" style="margin-top:9px">
+        <div class="inline"><input id="ttSecret" type="password" placeholder="Client Secret" autocomplete="off"><button id="ttSaveSecret">Lưu</button></div>
+        <div class="hint">Chưa có key? <a href="https://bentarofficial.github.io/bigspy-ai-video-music-tool/tiktok-guide.html" target="_blank" rel="noopener" style="color:#e68ef0">Xem hướng dẫn lấy key TikTok</a></div></div>
+      <button id="ttConnect">Kết nối TikTok</button>
+      <div class="inline" id="ttTagsRow"><input id="ttTags" placeholder="Hashtag mặc định" title="Hashtag tự thêm vào caption"><button class="ghost" id="ttSaveTags">Lưu</button></div>
+      <button class="ghost danger" id="ttOff">Huỷ kết nối</button>
+      <button class="ghost" id="ttReset">Đổi Client Key / Secret</button>
     </div>
     <div class="svc" id="svcUpd">
       <div class="svc-top"><span class="svc-ic">⬆</span><div class="svc-name"><b>Phiên bản</b><small id="updVer"></small></div><span class="pill" id="updPill"></span></div>
@@ -789,6 +806,83 @@ $('#cxToggle').onclick = async () => {
   loadKeys();
 };
 
+// ---- TikTok ----
+let tt = {};
+async function loadTikTok() {
+  try { tt = await api('/api/tiktok/settings'); } catch { return; }
+  const on = tt.connected;
+  $('#ttPill').textContent = on ? 'Đã kết nối' : 'Chưa kết nối'; $('#ttPill').className = 'pill' + (on ? ' on' : '');
+  $('#ttSub').textContent = on ? (tt.name || 'Tài khoản đã kết nối') : !tt.hasSecret ? 'Cần Client Key + Secret' : 'Gửi video vào hộp nháp TikTok';
+  $('#ttIc').innerHTML = on && tt.avatar ? `<img class="ttav" src="${tt.avatar}" alt="">` : '🎬';
+  $('#ttSecretForm').hidden = on || tt.hasSecret;
+  if (document.activeElement !== $('#ttKey') && !$('#ttKey').value) $('#ttKey').value = tt.hasSecret ? tt.clientKey : '';
+  $('#ttConnect').hidden = on || !tt.hasSecret;
+  $('#ttTagsRow').hidden = !on; $('#ttOff').hidden = !on; $('#ttReset').hidden = on || !tt.hasSecret;
+  if (document.activeElement !== $('#ttTags')) $('#ttTags').value = tt.hashtags || '';
+}
+const ttPost = (body) => api('/api/tiktok/settings', {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)});
+$('#ttSaveSecret').onclick = async () => {
+  const k = $('#ttKey').value.trim(), v = $('#ttSecret').value.trim();
+  if (!k) return $('#ttKey').focus(); if (!v) return $('#ttSecret').focus();
+  try { await ttPost({clientKey: k, clientSecret: v}); $('#ttSecret').value = ''; } catch (e) { alert(e.message); }
+  loadTikTok();
+};
+$('#ttSecret').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); $('#ttSaveSecret').click(); } };
+$('#ttSaveTags').onclick = async () => { try { await ttPost({hashtags: $('#ttTags').value}); } catch (e) { alert(e.message); } loadTikTok(); };
+$('#ttConnect').onclick = async () => {
+  try { const r = await api('/api/tiktok/auth-url'); window.open(r.url, '_blank'); } catch (e) { alert(e.message); return; }
+  let n = 0; const iv = setInterval(async () => { await loadTikTok(); if (tt.connected || ++n > 100) clearInterval(iv); }, 3000);
+};
+$('#ttReset').onclick = async () => { try { await ttPost({clientSecret: ''}); } catch (e) { alert(e.message); } loadTikTok(); };
+window.addEventListener('message', e => { if (e.data === 'tiktok-connected') loadTikTok(); });
+$('#ttOff').onclick = async () => {
+  if (!confirm('Huỷ kết nối TikTok? Công cụ sẽ không gửi được video nữa cho tới khi kết nối lại.')) return;
+  try { await api('/api/tiktok/disconnect', {method: 'POST'}); } catch (e) { alert(e.message); }
+  loadTikTok();
+};
+
+const TT_STATE = {starting: 'Đang chuẩn bị…', uploading: 'Đang tải lên TikTok', processing: 'TikTok đang xử lý video…',
+  inbox: '✓ Đã vào hộp thư TikTok. Mở app TikTok trên điện thoại → bấm thông báo → dán caption → Đăng hoặc Lên lịch.',
+  posted: '✓ Video đã được đăng trên TikTok.', error: 'Lỗi'};
+async function tiktokDialog(j) {
+  await loadTikTok();
+  if (!tt.connected) { alert('Chưa kết nối TikTok.\nMở Cài đặt → TikTok → Kết nối TikTok trước.'); $('#setBtn').click(); return; }
+  let info = {}; try { info = await api(`/api/jobs/${j.id}/tiktok`); } catch {}
+  const w = document.createElement('div'); w.className = 'ttmodal';
+  w.innerHTML = `<div class="ttbox"><h3>🎬 Gửi lên TikTok</h3><div class="hint" style="margin:0">Video vào hộp nháp của <b></b>. Bạn hoàn tất và đăng trong app TikTok.</div>
+    <textarea id="ttCap" maxlength="2200"></textarea><div class="hint">TikTok không nhận caption qua chế độ hộp nháp — công cụ sẽ chép caption này để bạn dán khi đăng.</div>
+    <div class="ttst" hidden></div>
+    <div class="row"><button class="ghost" data-a="close">Đóng</button><button class="ghost" data-a="copy">📋 Chép caption</button><button data-a="send">Gửi lên TikTok</button></div></div>`;
+  w.querySelector('b').textContent = tt.name || 'tài khoản TikTok';
+  const cap = w.querySelector('#ttCap'); cap.value = info.caption || '';
+  const st = w.querySelector('.ttst'), send = w.querySelector('[data-a=send]');
+  let poll = null;
+  const close = () => { clearInterval(poll); w.remove(); };
+  const copy = async () => { try { await navigator.clipboard.writeText(cap.value); return true; } catch { cap.select(); return document.execCommand('copy'); } };
+  const show = (s) => {
+    if (!s?.state) return;
+    st.hidden = false;
+    st.className = 'ttst' + (s.state === 'error' ? ' err' : ['inbox', 'posted'].includes(s.state) ? ' ok' : '');
+    st.textContent = s.state === 'error' ? '⚠ ' + (s.error || 'Lỗi không rõ') : (TT_STATE[s.state] || s.state) + (s.state === 'uploading' && s.progress != null ? ` ${s.progress}%` : '') + (s.note ? ' ' + s.note : '');
+    const busy = ['starting', 'uploading', 'processing'].includes(s.state) && !s.note;
+    send.disabled = busy; send.textContent = busy ? 'Đang gửi…' : ['inbox', 'posted'].includes(s.state) ? 'Gửi lại' : 'Gửi lên TikTok';
+    if (!busy) clearInterval(poll);
+  };
+  const watch = () => { clearInterval(poll); poll = setInterval(async () => { try { show(await api(`/api/jobs/${j.id}/tiktok`)); } catch {} }, 2000); };
+  if (info.state && Date.now() / 1000 - (info.at || 0) < 86400) { show(info); if (['starting', 'uploading', 'processing'].includes(info.state)) watch(); }
+  w.onclick = e => { if (e.target === w) close(); };
+  w.querySelector('[data-a=close]').onclick = close;
+  w.querySelector('[data-a=copy]').onclick = async (e) => { if (await copy()) { e.target.textContent = '✓ Đã chép'; setTimeout(() => e.target.textContent = '📋 Chép caption', 1500); } };
+  send.onclick = async () => {
+    send.disabled = true;
+    try {
+      await api(`/api/jobs/${j.id}/tiktok`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({caption: cap.value})});
+      copy(); show({state: 'starting'}); watch();
+    } catch (e) { show({state: 'error', error: e.message}); send.disabled = false; }
+  };
+  document.body.append(w);
+}
+
 // ---- jobs ----
 const label = {running: 'đang chạy', done: 'xong', error: 'lỗi', stopped: 'đã dừng'};
 async function loadJobs() {
@@ -815,7 +909,7 @@ function jobMenu(j, btn) {
   closeJobMenu(); if (wasOpen) return;
   btn.classList.add('open');
   const m = document.createElement('div'); m.className = 'jmenu';
-  m.innerHTML = `<button data-a="rename">✏️ Đổi tên</button>${j.hasVideo ? '<button data-a="dl">⬇️ Tải video</button>' : ''}<button data-a="del" class="danger">🗑 Xoá dự án</button>`;
+  m.innerHTML = `<button data-a="rename">✏️ Đổi tên</button>${j.hasVideo ? '<button data-a="dl">⬇️ Tải video</button><button data-a="tt">🎬 Gửi lên TikTok</button>' : ''}<button data-a="del" class="danger">🗑 Xoá dự án</button>`;
   m.onclick = e => e.stopPropagation();
   const r = btn.getBoundingClientRect();
   m.style.top = r.bottom + 4 + 'px'; m.style.left = Math.max(8, r.right - 150) + 'px';
@@ -828,6 +922,7 @@ function jobMenu(j, btn) {
     loadJobs();
   };
   m.querySelector('[data-a=dl]')?.addEventListener('click', () => { closeJobMenu(); location.href = `/api/jobs/${j.id}/video`; });
+  m.querySelector('[data-a=tt]')?.addEventListener('click', () => { closeJobMenu(); tiktokDialog(j); });
   m.querySelector('[data-a=del]').onclick = async () => {
     closeJobMenu();
     if (!confirm(`Xoá dự án "${j.title || j.id}"?\nVideo, phụ đề và file nhạc đã tải lên sẽ bị xoá vĩnh viễn.`)) return;
@@ -891,7 +986,7 @@ async function refresh() {
   if (j.status === 'running') timer = setTimeout(refresh, 2000); else loadJobs();
 }
 
-loadKeys(); loadJobs();
+loadKeys(); loadTikTok(); loadJobs();
 
 // ---- không gian làm việc: kéo đổi độ rộng + bật/tắt bảng (nhớ trong trình duyệt) ----
 const app = $('.app'), store = (k, v) => { try { v === undefined ? (v = localStorage.getItem(k)) : localStorage.setItem(k, v); } catch { v = null; } return v; };

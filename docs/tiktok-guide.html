@@ -1,0 +1,56 @@
+<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="icon.png"><link rel="stylesheet" href="style.css"><title>Hướng dẫn kết nối TikTok</title>
+<style>code{background:#1f1f23;padding:2px 6px;border-radius:6px;word-break:break-all}pre{background:#1f1f23;padding:12px;border-radius:10px;white-space:pre-wrap;word-break:break-word}.note{border-left:3px solid #e0479e;padding:8px 12px;background:rgba(255,255,255,.04);border-radius:6px}ol li{margin:6px 0}</style></head><body><main>
+<header><img src="icon.png" alt=""><h1>Hướng dẫn kết nối TikTok</h1></header>
+<p>Làm một lần để công cụ <b>gửi video đã xuất vào hộp nháp TikTok</b> của bạn. Sau đó bạn mở app TikTok trên điện thoại, dán caption và bấm <b>Đăng</b> hoặc <b>Lên lịch</b>. Dùng API chính thức của TikTok: miễn phí, không vi phạm điều khoản.</p>
+<p class="note">Bạn cần: một tài khoản TikTok và khoảng 15 phút. Mọi thứ đều miễn phí.</p>
+
+<h2>Bước 1. Tạo app trên TikTok for Developers</h2><ol>
+<li>Vào <a href="https://developers.tiktok.com" target="_blank">developers.tiktok.com</a> → <b>Log in</b> bằng tài khoản TikTok.</li>
+<li>Bấm <b>Developer Portal</b> (thanh menu trên) → <b>Manage apps</b> → <b>Connect an app</b>.</li>
+<li>Ownership: chọn <b>Individual</b> → <b>Confirm</b>.</li>
+<li>App name: tên tuỳ ý (ví dụ tên kênh của bạn). App type: <b>Other</b> → <b>Create app</b>.</li></ol>
+
+<h2>Bước 2. Điền thông tin cơ bản</h2><ol>
+<li><b>App icon</b>: ảnh vuông 1024×1024 (PNG/JPG).</li>
+<li><b>Category</b>: Entertainment. <b>Description</b>: ví dụ <code>Make music videos and send them to my TikTok as drafts.</code></li>
+<li><b>Terms of Service URL</b> và <b>Privacy Policy URL</b>: dùng link trang của bạn, hoặc dùng trang có sẵn của công cụ:<br>
+<code>https://bentarofficial.github.io/bigspy-ai-video-music-tool/terms.html</code><br>
+<code>https://bentarofficial.github.io/bigspy-ai-video-music-tool/privacy.html</code><br>
+Nếu TikTok báo <i>URL not verified</i> và bạn đang ở chế độ Sandbox (bước 5) thì có thể bỏ qua — chỉ cần xác minh khi nộp duyệt bản chính.</li>
+<li><b>Platforms</b>: tick <b>Desktop</b>.</li></ol>
+
+<h2>Bước 3. Thêm sản phẩm (Products)</h2><ol>
+<li>Bấm <b>+ Add products</b> → <b>Add</b> ở <b>Login Kit</b>, rồi <b>Add</b> ở <b>Content Posting API</b> → <b>Done</b>.</li>
+<li>Trong <b>Login Kit</b> → tab <b>Desktop</b> → Redirect URI, nhập:<pre>http://127.0.0.1:*/tiktok/callback/
+http://127.0.0.1:8790/tiktok/callback/</pre></li>
+<li>Trong <b>Content Posting API</b>: giữ mặc định (Upload to TikTok đã bật). <b>Direct Post</b> để tắt, <b>Verify domains</b> bỏ qua.</li></ol>
+
+<h2>Bước 4. Thêm quyền (Scopes)</h2>
+<p>Bấm <b>+ Add scopes</b>, chọn đúng 2 quyền: <code>user.info.basic</code> và <code>video.upload</code>. Bấm <b>Save</b>.</p>
+
+<h2>Bước 5. Tạo Sandbox (dùng ngay, không cần TikTok duyệt)</h2><ol>
+<li>Ở đầu trang app, chọn <b>Sandbox</b> → <b>Create Sandbox</b>. Đặt tên (ví dụ <code>test</code>), tick <b>Clone from Production</b> → <b>Confirm</b>.</li>
+<li>Kéo xuống <b>Sandbox settings</b> → <b>Target users</b> → thêm (đăng nhập) <b>tài khoản TikTok sẽ nhận video</b>.</li>
+<li>Bấm <b>Apply changes</b>.</li></ol>
+<p class="note">Sandbox chỉ cho các tài khoản trong Target users dùng — đủ cho kênh của chính bạn. Không cần bấm <i>Submit for review</i>.</p>
+
+<h2>Bước 6. Lấy Client Key và Client Secret</h2><ol>
+<li>Trong trang Sandbox, mục <b>Credentials</b>: bấm biểu tượng 👁 để hiện <b>Client key</b> và <b>Client secret</b>, rồi copy.</li>
+<li><b>Giữ Client Secret bí mật</b> như mật khẩu — không gửi cho ai. Lỡ lộ thì bấm <b>Reset</b> để tạo mới.</li></ol>
+
+<h2>Bước 7. Nhập vào công cụ</h2><ol>
+<li>Mở công cụ → <b>Cài đặt</b> (góc dưới bên trái) → mục <b>TikTok</b>.</li>
+<li>Dán <b>Client Key</b> và <b>Client Secret</b> → <b>Lưu</b>.</li>
+<li>Bấm <b>Kết nối TikTok</b> → đăng nhập trên trang của TikTok → <b>Authorize</b>. Thấy “Đã kết nối TikTok ✓” là xong. Kết nối giữ khoảng 6 tháng.</li>
+<li>(Tuỳ chọn) Sửa <b>hashtag mặc định</b> sẽ được thêm vào caption.</li></ol>
+
+<h2>Gửi video</h2><ol>
+<li>Xuất video xong → ở danh sách <b>Dự án</b>, bấm <b>⋯</b> → <b>🎬 Gửi lên TikTok</b>.</li>
+<li>Sửa caption nếu muốn → <b>Gửi lên TikTok</b>. Caption được chép sẵn vào bộ nhớ tạm.</li>
+<li>Khi báo <i>Đã vào hộp thư TikTok</i>: mở app TikTok trên điện thoại → bấm thông báo → dán caption → <b>Đăng</b> hoặc <b>Lên lịch</b>.</li></ol>
+
+<h2>Lỗi thường gặp</h2><ul>
+<li><b>“5 video đang chờ”</b>: TikTok chỉ cho tối đa 5 bản nháp chờ trong 24 giờ. Đăng hoặc xoá bớt trong app rồi gửi lại.</li>
+<li><b>Lỗi khi đăng nhập / redirect_uri</b>: kiểm tra Redirect URI ở bước 3 và tài khoản đã có trong Target users ở bước 5.</li>
+<li><b>Phiên hết hạn</b>: vào Cài đặt → TikTok → Kết nối lại.</li></ul>
+<footer><a href="index.html">Trang chủ</a> · <a href="terms.html">Terms of Service</a> · <a href="privacy.html">Privacy Policy</a><br>Liên hệ: <a href="mailto:contact@bigspyai.com">contact@bigspyai.com</a></footer></main></body></html>

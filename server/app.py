@@ -879,3 +879,71 @@ def open_export(job_id: str):
     f = _last_export(job_id)
     subprocess.Popen(f'explorer /select,"{f}"')
     return {"ok": True}
+
+
+# ---------- TikTok: kết nối & gửi video vào hộp nháp ----------
+from server import tiktok  # noqa: E402
+import threading  # noqa: E402
+
+app.include_router(tiktok.router)
+DEFAULT_TAGS = "#xuhuongtiktok #nhachay #chill"
+
+
+@app.post("/api/tiktok/settings")
+def tiktok_settings(body: dict):
+    """Lưu Client Secret / Client Key (production) / hashtag mặc định vào .env."""
+    for k, env in (("clientSecret", "TIKTOK_CLIENT_SECRET"), ("clientKey", "TIKTOK_CLIENT_KEY"), ("hashtags", "TIKTOK_HASHTAGS")):
+        if k in body:
+            v = str(body[k]).strip()[:300]
+            _set_env(env, v or None)
+    return {**tiktok.status(), "hashtags": os.environ.get("TIKTOK_HASHTAGS", DEFAULT_TAGS)}
+
+
+@app.get("/api/tiktok/settings")
+def tiktok_get_settings():
+    load_env()
+    return {**tiktok.status(), "hashtags": os.environ.get("TIKTOK_HASHTAGS", DEFAULT_TAGS)}
+
+
+def _caption(meta: dict) -> str:
+    title = re.sub(r"\.(wav|mp3|m4a|flac|ogg|aac)$", "", meta.get("title") or "", flags=re.I).strip()
+    return f"{title} {os.environ.get('TIKTOK_HASHTAGS', DEFAULT_TAGS)}".strip()
+
+
+@app.get("/api/jobs/{job_id}/tiktok")
+def job_tiktok(job_id: str):
+    meta = read_meta(job_dir(job_id))
+    return {**(meta.get("tiktok") or {}), "caption": meta.get("caption") or _caption(meta)}
+
+
+@app.post("/api/jobs/{job_id}/tiktok")
+def send_tiktok(job_id: str, body: dict | None = None):
+    d = job_dir(job_id)
+    video = d / "video.mp4"
+    if status_of(job_id, d) == "running":
+        raise HTTPException(409, "Video đang render — đợi xong rồi gửi.")
+    if not video.exists():
+        raise HTTPException(400, "Dự án chưa có video — hãy xuất video trước.")
+    cur = read_meta(d).get("tiktok") or {}
+    if cur.get("state") in {"starting", "uploading", "processing"} and time.time() - cur.get("at", 0) < 900:
+        raise HTTPException(409, "Video này đang được gửi lên TikTok.")
+    tiktok.access_token()  # báo lỗi ngay nếu chưa kết nối
+    caption = str((body or {}).get("caption", "")).strip()[:2200]
+
+    def set_state(s: dict):
+        m = read_meta(d)
+        m["tiktok"] = {**s, "at": time.time()}
+        if caption:
+            m["caption"] = caption
+        write_meta(d, m)
+
+    def run():
+        try:
+            tiktok.upload(video, set_state)
+        except Exception as e:  # noqa: BLE001
+            msg = e.detail if isinstance(e, HTTPException) else str(e)
+            set_state({"state": "error", "error": msg})
+
+    set_state({"state": "starting"})
+    threading.Thread(target=run, daemon=True).start()
+    return {"ok": True}
