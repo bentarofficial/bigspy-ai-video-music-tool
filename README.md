@@ -67,6 +67,10 @@ copy .env.example .env    # rồi điền PIXABAY_API_KEY (hoặc nhập trong g
 
 Log của server nằm trong `logs\`, log từng video nằm trong `output\<job>\log.txt`.
 
+### Khi ổ cài đặt gần đầy
+
+File nhạc và video có thể chiếm nhiều dung lượng. Tắt app, thêm `AI_MUSIC_VIDEO_DATA_DIR=D:\AI-Music-Video-Data` vào file `.env` trong thư mục cài đặt, rồi chép `output`, `uploads`, `exports`, `.cache` và nội dung `remotion/public` cũ sang thư mục dữ liệu mới (nội dung cuối cùng đặt trong `public`). Mở lại app; upload, file tạm và video mới sẽ dùng ổ dữ liệu này. Nếu đường dẫn chưa có, app sẽ tạo tự động.
+
 ## Trong giao diện
 
 - **Kiểu phụ đề**

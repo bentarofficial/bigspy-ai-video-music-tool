@@ -6,6 +6,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -16,15 +17,28 @@ from fastapi.staticfiles import StaticFiles
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from make_video import slugify  # noqa: E402
-from musicvideo.config import OUTPUT_DIR, PUBLIC_DIR, REMOTION_DIR, SIZES, load_env  # noqa: E402
+from musicvideo.config import CACHE_DIR, EXPORTS_DIR, OUTPUT_DIR, PUBLIC_DIR, REMOTION_DIR, SIZES, UPLOADS_DIR, load_env  # noqa: E402
 
-UPLOADS = ROOT / "uploads"
+UPLOADS = UPLOADS_DIR
 LOGOS = ROOT / "logos"  # thư viện logo kênh, giữ qua các lần mở app / cập nhật
 LOGO_EXT = {".png", ".webp", ".jpg", ".jpeg", ".svg"}
 ENV_FILE = ROOT / ".env"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # không bật cửa sổ console trên Windows
 
 app = FastAPI(title="AI Music Video Tool")
+
+# Starlette lưu file multipart lớn xuống thư mục tạm trước khi gọi endpoint.
+# Dùng cùng ổ với dữ liệu để tránh lỗi mơ hồ khi ổ C (TEMP mặc định) đầy.
+TEMP_DIR = CACHE_DIR / "tmp"
+TEMP_DIR.mkdir(parents=True, exist_ok=True)
+tempfile.tempdir = str(TEMP_DIR)
+os.environ["TMP"] = os.environ["TEMP"] = str(TEMP_DIR)
+
+
+def _disk_full(exc: OSError) -> None:
+    if exc.errno == 28:
+        raise HTTPException(507, "Ổ lưu dữ liệu đã đầy. Hãy giải phóng dung lượng hoặc đặt AI_MUSIC_VIDEO_DATA_DIR trong file .env sang ổ còn trống.") from exc
+    raise exc
 
 
 @app.on_event("startup")
@@ -275,10 +289,18 @@ async def create_job(
         raise HTTPException(400, "chỉ nhận mp3, wav, m4a, flac, ogg, aac")
     job_id = f"{slugify(title or Path(audio.filename or 'song').stem)[:40]}-{secrets.token_hex(2)}"
     d = OUTPUT_DIR / job_id
-    d.mkdir(parents=True, exist_ok=True)
-    UPLOADS.mkdir(exist_ok=True)
     src = UPLOADS / f"{job_id}{ext}"
-    src.write_bytes(await audio.read())
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+        UPLOADS.mkdir(parents=True, exist_ok=True)
+        if audio.size and shutil.disk_usage(UPLOADS).free < audio.size + (16 << 20):
+            raise HTTPException(507, "Ổ lưu dữ liệu không đủ chỗ cho file nhạc. Hãy giải phóng dung lượng hoặc đặt AI_MUSIC_VIDEO_DATA_DIR trong file .env sang ổ còn trống.")
+        with src.open("wb") as out:
+            while chunk := await audio.read(1 << 20):
+                out.write(chunk)
+    except OSError as exc:
+        src.unlink(missing_ok=True)
+        _disk_full(exc)
 
     args = [str(src), "--job", job_id, "--orientation", orientation, "--subtitle-mode", subtitle_mode,
             "--title-animation", title_animation, "--title-color", title_color,
@@ -761,7 +783,7 @@ async def upload_media(job_id: str, file: UploadFile = File(...)):
     return {"id": _uid(), "name": name, "src": f"jobs/{job_id}/media/{fn}", "type": MEDIA_EXT[ext]}
 
 
-EXPORTS = ROOT / "exports"
+EXPORTS = EXPORTS_DIR
 CRF = {"low": 28, "medium": 23, "high": 20, "best": 17}
 X264 = {"fast": "superfast", "balanced": "veryfast", "small": "medium"}
 

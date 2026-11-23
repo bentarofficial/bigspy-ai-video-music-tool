@@ -30,7 +30,7 @@ def slugify(name: str) -> str:
 def render(props_path: Path, out: Path) -> None:
     print(f"▶ Render bằng Remotion -> {out}")
     subprocess.run(
-        f'npx remotion render src/index.ts MusicVideo "{out}" --props="{props_path}" --timeout=120000',
+        f'npx remotion render src/index.ts MusicVideo "{out}" --props="{props_path}" --public-dir="{PUBLIC_DIR}" --timeout=120000',
         cwd=REMOTION_DIR, shell=True, check=True,
     )
 
