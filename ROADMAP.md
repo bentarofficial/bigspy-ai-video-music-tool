@@ -46,3 +46,4 @@ Các việc còn dở, tổng hợp từ các phiên làm việc trước (21/11
   3. **Cài đặt**: thêm một khối `.svc` trong bảng Cài đặt để nhập key và Kết nối, kèm link hướng dẫn trong `docs/` (GitHub Pages).
   4. **Caption**: dùng lại `POST /api/jobs/{id}/tiktok/caption` (AI viết từ tên bài + lời) hoặc tách thành endpoint chung nếu nền tảng mới cần độ dài hoặc hashtag khác.
   5. Video nguồn là `output/<job>/video.mp4` (bản H.264 xuất từ Editor được chép vào đây).
+- [ ] **Tự xuất lại video trước khi đăng nếu có chỉnh sửa chưa xuất**: hiện sửa trong Editor mà không bấm Xuất video, rồi đăng từ menu ⋯, thì video gửi đi là bản `video.mp4` cũ (không có chỉnh sửa, không cảnh báo). Cách làm: so thời gian sửa `timeline.json` với `video.mp4`; nếu timeline mới hơn thì tự render H.264 rồi mới đăng, đồng thời trang chủ hiện nhắc "Có chỉnh sửa chưa xuất".
