@@ -84,7 +84,17 @@ aside{background:rgba(12,12,14,.75);backdrop-filter:blur(20px);border-right:1px 
 .setbtn:hover,.setbtn.on{background:rgba(255,255,255,.07)}
 .setbtn svg{width:16px;height:16px}
 .setdot{position:absolute;left:24px;top:7px;width:7px;height:7px;border-radius:50%;background:#f59e0b}
-.setwrap .keys{position:absolute;left:0;right:0;bottom:calc(100% + 6px);margin:0;z-index:50;background:#151518;box-shadow:0 12px 40px rgba(0,0,0,.55);max-height:70vh;overflow:auto}
+#setPop{position:fixed;inset:0;z-index:200;margin:0;padding:24px;border:0;border-radius:0;background:rgba(0,0,0,.55);display:grid;place-items:center}
+#setPop[hidden]{display:none}
+.sdlg{width:min(860px,100%);height:min(640px,100%);background:#151518;border:1px solid var(--line);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);display:grid;grid-template-columns:200px 1fr;grid-template-rows:auto 1fr;overflow:hidden}
+.shead{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}.shead b{font-size:15px}
+.sclose{background:none;border:0;color:var(--mute);font-size:16px;cursor:pointer;padding:4px 8px;border-radius:8px;width:auto}.sclose:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.snav{padding:10px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:2px;overflow:auto}
+.snav button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;background:none;border:0;color:var(--text);font-size:13px;cursor:pointer}
+.snav button span{width:18px;text-align:center}.snav button:hover{background:rgba(255,255,255,.05)}.snav button.on{background:rgba(255,255,255,.1)}
+.sbody{overflow:auto;padding:18px 24px}.sbody h2{font-size:15px;margin:0 0 4px}.ssub{color:var(--dim);font-size:12px;margin:0 0 14px}
+.ssec .svc{max-width:520px;padding:14px 0}.ssec .svc:first-of-type{padding-top:14px;border-top:1px solid var(--line)}
+@media (max-width:640px){.sdlg{grid-template-columns:1fr;grid-template-rows:auto auto 1fr}.snav{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto}.snav button{white-space:nowrap;width:auto}}
 .keys{margin:10px;padding:14px;border-radius:14px;background:rgba(255,255,255,.025);border:1px solid var(--line)}
 .svc{padding:10px 0;border-top:1px solid var(--line)}.svc:first-of-type{border-top:0;padding-top:2px}
 .svc-top{display:flex;align-items:center;gap:9px}
@@ -249,41 +259,56 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
   <div class="setwrap">
   <button type="button" class="setbtn" id="setBtn" title="Cài đặt: kết nối & phiên bản"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Cài đặt</span><i class="setdot" id="setDot" hidden></i></button>
   <div class="keys" id="setPop" hidden>
-    <div class="k-head">🔌 Kết nối</div>
-    <div class="svc" id="svcPix">
-      <div class="svc-top"><span class="svc-ic">🖼</span><div class="svc-name"><b>Pixabay</b><small id="k1"></small></div><span class="pill" id="pixPill"></span></div>
-      <div class="inline" id="pixForm"><input id="pix" placeholder="Dán API key…"><button id="saveKeys">Kết nối</button></div>
-      <button class="ghost danger" id="pixOff">Huỷ kết nối</button>
-      <div class="hint" id="pixHint">Key miễn phí: pixabay.com/api/docs</div>
-    </div>
+   <div class="sdlg" role="dialog" aria-label="Cài đặt">
+    <div class="shead"><b>Cài đặt</b><button type="button" class="sclose" id="setClose" title="Đóng (Esc)">✕</button></div>
+    <nav class="snav"><button type="button" data-sec="ai"><span>🧠</span>Dịch vụ AI</button><button type="button" data-sec="stock"><span>🖼</span>Kho cảnh quay</button><button type="button" data-sec="social"><span>📤</span>Mạng xã hội</button><button type="button" data-sec="storage"><span>🧹</span>Lưu trữ</button><button type="button" data-sec="about"><span>⬆</span>Phiên bản</button></nav>
+    <div class="sbody">
+      <section class="ssec" data-sec="ai" hidden><h2>Dịch vụ AI</h2><p class="ssub">Model viết từ khoá cảnh, research lời bài hát và sửa video trong Editor.</p>
     <div class="svc" id="svcClaude">
-      <div class="svc-top"><span class="svc-ic">🧠</span><div class="svc-name"><b>Claude CLI</b><small id="k2"></small></div><span class="pill" id="clPill"></span></div>
-      <button class="ghost" id="clToggle"></button>
-    </div>
-    <div class="svc" id="svcCodex">
-      <div class="svc-top"><span class="svc-ic">🤖</span><div class="svc-name"><b>ChatGPT Codex CLI</b><small id="k3"></small></div><span class="pill" id="cxPill"></span></div>
-      <button class="ghost" id="cxToggle"></button>
-    </div>
+        <div class="svc-top"><span class="svc-ic">🧠</span><div class="svc-name"><b>Claude CLI</b><small id="k2"></small></div><span class="pill" id="clPill"></span></div>
+        <button class="ghost" id="clToggle"></button>
+      </div>
+      <div class="svc" id="svcCodex">
+        <div class="svc-top"><span class="svc-ic">🤖</span><div class="svc-name"><b>ChatGPT Codex CLI</b><small id="k3"></small></div><span class="pill" id="cxPill"></span></div>
+        <button class="ghost" id="cxToggle"></button>
+      </div>
+      </section>
+      <section class="ssec" data-sec="stock" hidden><h2>Kho cảnh quay</h2><p class="ssub">Nguồn video miễn phí bản quyền để ghép vào bài hát.</p>
+    <div class="svc" id="svcPix">
+        <div class="svc-top"><span class="svc-ic">🖼</span><div class="svc-name"><b>Pixabay</b><small id="k1"></small></div><span class="pill" id="pixPill"></span></div>
+        <div class="inline" id="pixForm"><input id="pix" placeholder="Dán API key…"><button id="saveKeys">Kết nối</button></div>
+        <button class="ghost danger" id="pixOff">Huỷ kết nối</button>
+        <div class="hint" id="pixHint">Key miễn phí: pixabay.com/api/docs</div>
+      </div>
+      </section>
+      <section class="ssec" data-sec="social" hidden><h2>Mạng xã hội</h2><p class="ssub">Kết nối tài khoản để đăng video thẳng từ app.</p>
     <div class="svc" id="svcTT">
-      <div class="svc-top"><span class="svc-ic" id="ttIc">🎬</span><div class="svc-name"><b>TikTok</b><small id="ttSub"></small></div><span class="pill" id="ttPill"></span></div>
-      <div id="ttSecretForm"><input id="ttKey" placeholder="Client Key" autocomplete="off" style="margin-top:9px">
-        <div class="inline"><input id="ttSecret" type="password" placeholder="Client Secret" autocomplete="off"><button id="ttSaveSecret">Lưu</button></div>
-        <div class="hint">Chưa có key? <a href="https://bentarofficial.github.io/bigspy-ai-video-music-tool/tiktok-guide.html" target="_blank" rel="noopener" style="color:#e68ef0">Xem hướng dẫn lấy key TikTok</a></div></div>
-      <button id="ttConnect">Kết nối TikTok</button>
-      <div id="ttTagsRow"><div class="hint" style="margin-top:9px">Hashtag luôn thêm vào cuối caption (AI tự chọn thêm tag hợp bài):</div><div class="inline" style="margin-top:4px"><input id="ttTags" placeholder="Hashtag luôn thêm, vd: #bentarmusic" title="Hashtag luôn được thêm vào cuối mọi caption (AI tự chọn thêm hashtag hợp bài)"><button class="ghost" id="ttSaveTags">Lưu</button></div></div>
-      <button class="ghost danger" id="ttOff">Huỷ kết nối</button>
-      <button class="ghost" id="ttReset">Đổi Client Key / Secret</button>
-    </div>
+        <div class="svc-top"><span class="svc-ic" id="ttIc">🎬</span><div class="svc-name"><b>TikTok</b><small id="ttSub"></small></div><span class="pill" id="ttPill"></span></div>
+        <div id="ttSecretForm"><input id="ttKey" placeholder="Client Key" autocomplete="off" style="margin-top:9px">
+          <div class="inline"><input id="ttSecret" type="password" placeholder="Client Secret" autocomplete="off"><button id="ttSaveSecret">Lưu</button></div>
+          <div class="hint">Chưa có key? <a href="https://bentarofficial.github.io/bigspy-ai-video-music-tool/tiktok-guide.html" target="_blank" rel="noopener" style="color:#e68ef0">Xem hướng dẫn lấy key TikTok</a></div></div>
+        <button id="ttConnect">Kết nối TikTok</button>
+        <div id="ttTagsRow"><div class="hint" style="margin-top:9px">Hashtag luôn thêm vào cuối caption (AI tự chọn thêm tag hợp bài):</div><div class="inline" style="margin-top:4px"><input id="ttTags" placeholder="Hashtag luôn thêm, vd: #bentarmusic" title="Hashtag luôn được thêm vào cuối mọi caption (AI tự chọn thêm hashtag hợp bài)"><button class="ghost" id="ttSaveTags">Lưu</button></div></div>
+        <button class="ghost danger" id="ttOff">Huỷ kết nối</button>
+        <button class="ghost" id="ttReset">Đổi Client Key / Secret</button>
+      </div>
+      </section>
+      <section class="ssec" data-sec="storage" hidden><h2>Lưu trữ</h2><p class="ssub">Dung lượng app dùng trên máy bạn.</p>
     <div class="svc" id="svcClips">
-      <div class="svc-top"><span class="svc-ic">🧹</span><div class="svc-name"><b>Clip đã tải</b><small id="clipSize">…</small></div></div>
-      <button class="ghost" id="clipClean">Dọn dẹp</button>
-      <div class="hint">Xoá các clip Pixabay đã tải về để giải phóng ổ đĩa. Video đã làm không bị ảnh hưởng; mở lại dự án trong Editor thì app tự tải lại clip cần dùng.</div>
-    </div>
+        <div class="svc-top"><span class="svc-ic">🧹</span><div class="svc-name"><b>Clip đã tải</b><small id="clipSize">…</small></div></div>
+        <button class="ghost" id="clipClean">Dọn dẹp</button>
+        <div class="hint">Xoá các clip Pixabay đã tải về để giải phóng ổ đĩa. Video đã làm không bị ảnh hưởng; mở lại dự án trong Editor thì app tự tải lại clip cần dùng.</div>
+      </div>
+      </section>
+      <section class="ssec" data-sec="about" hidden><h2>Phiên bản</h2><p class="ssub">Cập nhật app lên bản mới nhất.</p>
     <div class="svc" id="svcUpd">
-      <div class="svc-top"><span class="svc-ic">⬆</span><div class="svc-name"><b>Phiên bản</b><small id="updVer"></small></div><span class="pill" id="updPill"></span></div>
-      <button class="ghost" id="updCheck">Kiểm tra cập nhật</button>
-      <button id="updBtn" style="display:none">Cập nhật ngay</button>
+        <div class="svc-top"><span class="svc-ic">⬆</span><div class="svc-name"><b>Phiên bản</b><small id="updVer"></small></div><span class="pill" id="updPill"></span></div>
+        <button class="ghost" id="updCheck">Kiểm tra cập nhật</button>
+        <button id="updBtn" style="display:none">Cập nhật ngay</button>
+      </div>
+      </section>
     </div>
+   </div>
   </div>
   </div>
 </aside>
@@ -770,14 +795,19 @@ loadPrefs().then(() => loadLogos());
 
 // nút Cài đặt: mở/đóng bảng kết nối & phiên bản
 // bảng cài đặt phủ lên danh sách dự án, kéo cao sát dưới thanh logo
-function fitSetPop() {
-  const p = $('#setPop');
-  if (p.hidden) return;
-  const top = document.querySelector('.brand').getBoundingClientRect().bottom + 6;
-  p.style.height = p.style.maxHeight = Math.max(200, document.querySelector('.setwrap').getBoundingClientRect().top - 6 - top) + 'px';
+function showSec(k) {
+  if (!document.querySelector(`.ssec[data-sec="${k}"]`)) k = 'ai';
+  document.querySelectorAll('.ssec').forEach(x => x.hidden = x.dataset.sec !== k);
+  document.querySelectorAll('.snav button').forEach(b => b.classList.toggle('on', b.dataset.sec === k));
+  try { localStorage.setItem('setSec', k); } catch {}
+  if (k === 'storage') loadClips();
 }
-window.addEventListener('resize', fitSetPop);
-$('#setBtn').onclick = (e) => { e.stopPropagation(); const p = $('#setPop'); p.hidden = !p.hidden; $('#setBtn').classList.toggle('on', !p.hidden); fitSetPop(); if (!p.hidden) loadClips(); };
+document.querySelectorAll('.snav button').forEach(b => b.onclick = () => showSec(b.dataset.sec));
+document.body.appendChild($('#setPop')); // thanh bên có backdrop-filter -> popup fixed bị kẹt trong đó
+function closeSet() { $('#setPop').hidden = true; $('#setBtn').classList.remove('on'); }
+$('#setClose').onclick = closeSet;
+$('#setPop').addEventListener('mousedown', e => { if (e.target === $('#setPop')) closeSet(); });
+$('#setBtn').onclick = (e) => { e.stopPropagation(); const p = $('#setPop'); p.hidden = !p.hidden; $('#setBtn').classList.toggle('on', !p.hidden); if (!p.hidden) { let k; try { k = localStorage.getItem('setSec'); } catch {} showSec(k || 'ai'); } };
 // ---- dọn clip Pixabay đã tải ----
 const fmtBytes = b => b >= 1e9 ? (b / 1e9).toFixed(1).replace('.', ',') + ' GB' : Math.round(b / 1e6) + ' MB';
 async function loadClips() {
@@ -797,8 +827,7 @@ Video đã làm không bị ảnh hưởng. Mở lại dự án cũ trong Editor
   catch (err) { alert(err.message); }
   loadClips();
 };
-document.addEventListener('click', (e) => { if (!e.target.closest('.setwrap')) { $('#setPop').hidden = true; $('#setBtn').classList.remove('on'); } });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#setPop').hidden = true; $('#setBtn').classList.remove('on'); } });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#setPop').hidden) closeSet(); });
 // chấm cam trên nút khi cần chú ý: chưa kết nối Pixabay hoặc có bản cập nhật
 setInterval(() => { $('#setDot').hidden = !(!$('#pixForm').hidden || $('#updBtn').style.display !== 'none'); }, 1000);
 
@@ -921,7 +950,7 @@ const TT_STATE = {starting: 'Đang chuẩn bị…', uploading: 'Đang tải lê
   posted: '✓ Video đã được đăng trên TikTok.', error: 'Lỗi'};
 async function tiktokDialog(j) {
   await loadTikTok();
-  if (!tt.connected) { alert('Chưa kết nối TikTok.\nMở Cài đặt → TikTok → Kết nối TikTok trước.'); $('#setBtn').click(); return; }
+  if (!tt.connected) { alert('Chưa kết nối TikTok.\nMở Cài đặt → Mạng xã hội → Kết nối TikTok trước.'); if ($('#setPop').hidden) $('#setBtn').click(); showSec('social'); return; }
   let info = {}; try { info = await api(`/api/jobs/${j.id}/tiktok`); } catch {}
   const w = document.createElement('div'); w.className = 'ttmodal';
   w.innerHTML = `<div class="ttbox"><h3>🎬 Gửi lên TikTok</h3><div class="hint" style="margin:0">Video vào hộp nháp của <b></b>. Bạn hoàn tất và đăng trong app TikTok.</div>
