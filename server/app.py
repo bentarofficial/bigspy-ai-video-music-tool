@@ -935,7 +935,7 @@ from server import tiktok  # noqa: E402
 import threading  # noqa: E402
 
 app.include_router(tiktok.router)
-DEFAULT_TAGS = "#xuhuongtiktok #nhachay #chill"
+DEFAULT_TAGS = "#NhacHayMoiNgay #xh #music #chillout #bentarmusic"
 
 
 @app.post("/api/tiktok/settings")
