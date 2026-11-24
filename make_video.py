@@ -29,10 +29,17 @@ def slugify(name: str) -> str:
 
 def render(props_path: Path, out: Path) -> None:
     print(f"▶ Render bằng Remotion -> {out}")
-    subprocess.run(
-        f'npx remotion render src/index.ts MusicVideo "{out}" --props="{props_path}" --public-dir="{PUBLIC_DIR}" --timeout=120000',
-        cwd=REMOTION_DIR, shell=True, check=True,
-    )
+    base = f'npx remotion render src/index.ts MusicVideo "{out}" --props="{props_path}" --public-dir="{PUBLIC_DIR}" --timeout=120000'
+    # Remotion đôi khi lỗi ngẫu nhiên 'No frame found at position' dù clip vẫn tốt
+    # -> thử lại; lần sau giảm số luồng để bộ đọc frame ổn định hơn.
+    attempts = [base, base + " --concurrency=2", base + " --concurrency=1"]
+    for i, cmd in enumerate(attempts):
+        r = subprocess.run(cmd, cwd=REMOTION_DIR, shell=True)
+        if r.returncode == 0:
+            return
+        if i < len(attempts) - 1:
+            print(f"  ⚠ Render lỗi, thử lại lần {i + 2} (ít luồng hơn)…", flush=True)
+    raise subprocess.CalledProcessError(r.returncode, cmd)
 
 
 def main() -> None:
@@ -116,7 +123,11 @@ def main() -> None:
     pub_dir.mkdir(parents=True, exist_ok=True)
 
     print("① Chuẩn hóa audio")
-    if a.start is not None or a.end is not None:
+    cut_file = out_dir / "song_cut.wav"
+    if (a.start is not None or a.end is not None) and cut_file.exists() and cut_file.stat().st_size > 0:
+        src = cut_file
+        song = pub_dir / "song.wav"
+    elif a.start is not None or a.end is not None:
         # cắt đoạn nhạc cần dùng (cho video short) — mọi bước sau chỉ xử lý đoạn này
         s, e = a.start or 0.0, a.end
         print(f"  cắt đoạn {s:.1f}s → {e:.1f}s" if e else f"  cắt từ {s:.1f}s đến hết")
@@ -124,13 +135,22 @@ def main() -> None:
         song = pub_dir / "song.wav"
     else:
         song = pub_dir / f"song{src.suffix.lower()}"
-    shutil.copyfile(src, song)
-    wav = audio.to_wav(src, out_dir / "audio16k.wav")
+    if not (song.exists() and song.stat().st_size > 0):
+        shutil.copyfile(src, song)
+    wav = out_dir / "audio16k.wav"
+    if wav.exists() and wav.stat().st_size > 0:
+        print("  ↻ dùng lại audio đã chuẩn hóa")
+    else:
+        wav = audio.to_wav(src, wav)
     total = audio.duration_of(wav)
     print(f"  dài {total:.1f}s")
 
     lines: list[dict] = []
-    if not a.no_lyrics:
+    lyr_file = out_dir / "lyrics.json"
+    if not a.no_lyrics and lyr_file.exists():
+        lines = json.loads(lyr_file.read_text(encoding="utf-8"))
+        print(f"③ ↻ dùng lại lời đã nhận diện ({len(lines)} dòng)")
+    elif not a.no_lyrics:
         asr_input = wav
         print(f"③ Nhận diện lời (Whisper {a.whisper_model}, CPU — có thể mất vài phút)")
         recognized = lyrics.transcribe(asr_input, a.whisper_model, a.lang)
@@ -170,7 +190,13 @@ def main() -> None:
     print(f"  tempo {analysis['tempo']:.0f} BPM, {len(scene_list)} cảnh")
 
     print("⑤ Chọn từ khóa hình ảnh")
-    queries = keywords.generate(scene_list, a.title, a.theme, a.claude_model, a.claude_effort)
+    q_file = out_dir / "queries.json"
+    queries = json.loads(q_file.read_text(encoding="utf-8")) if q_file.exists() else None
+    if queries and len(queries) == len(scene_list):
+        print("  ↻ dùng lại từ khóa đã chọn")
+    else:
+        queries = keywords.generate(scene_list, a.title, a.theme, a.claude_model, a.claude_effort)
+        q_file.write_text(json.dumps(queries, ensure_ascii=False), encoding="utf-8")
 
     print("⑥ Tìm & tải clip từ Pixabay")
     px = Pixabay(key, CACHE_DIR, CLIPS_DIR)

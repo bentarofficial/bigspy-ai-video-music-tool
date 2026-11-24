@@ -399,7 +399,8 @@ async def create_job(
         (d / "lyrics_input.txt").write_text(lyrics, encoding="utf-8")
         args += ["--lyrics", str(d / "lyrics_input.txt")]
 
-    write_meta(d, {"id": job_id, "title": title or audio.filename, "created": time.time(), "status": "running"})
+    write_meta(d, {"id": job_id, "title": title or audio.filename, "created": time.time(), "status": "running",
+                   "args": args})
     spawn(job_id, d, args)
     return {"id": job_id}
 
@@ -515,6 +516,26 @@ def rerender(job_id: str):
     if status_of(job_id, d) == "running":
         raise HTTPException(409, "job đang chạy")
     spawn(job_id, d, ["--render-only", str(d / "props.json")])
+    return {"ok": True}
+
+
+@app.post("/api/jobs/{job_id}/resume")
+def resume_job(job_id: str):
+    """Tiếp tục / chạy lại job đã dừng hoặc lỗi: bỏ qua các bước đã xong (audio, lời, từ khóa, clip đã tải)."""
+    d = job_dir(job_id)
+    if status_of(job_id, d) == "running":
+        raise HTTPException(409, "job đang chạy")
+    args = read_meta(d).get("args")
+    if (d / "props.json").exists():  # đã chuẩn bị xong mọi thứ, chỉ còn bước render
+        with open(d / "log.txt", "a", encoding="utf-8") as log:
+            log.write("\n▶ Tiếp tục: các bước trước đã xong, chỉ render lại.\n")
+        spawn(job_id, d, ["--render-only", str(d / "props.json")])
+    elif args and Path(args[0]).exists():
+        with open(d / "log.txt", "a", encoding="utf-8") as log:
+            log.write("\n▶ Tiếp tục từ bước đang dở (bỏ qua các bước đã xong)…\n")
+        spawn(job_id, d, args)
+    else:
+        raise HTTPException(400, "Dự án tạo từ bản cũ, không lưu đủ thông tin để tiếp tục. Hãy tạo lại.")
     return {"ok": True}
 
 

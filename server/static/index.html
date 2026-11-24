@@ -394,6 +394,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
       <a id="dl" download><button class="ghost" type="button">⬇ Tải video</button></a>
       <button class="ghost" id="openEditor" type="button">✂ Mở Editor</button>
       <button class="ghost" id="stopJob" style="border-color:rgba(248,113,113,.4);color:var(--err)" hidden>■ Dừng</button>
+      <button id="resumeJob" type="button" title="Chạy tiếp từ bước đang dở, không làm lại các bước đã xong" hidden>▶ Tiếp tục</button>
     </div>
   </div>
   <div class="card" id="editor" hidden>
@@ -1041,6 +1042,7 @@ async function select(id) {
   document.querySelectorAll('#detail .tab').forEach(t => t.onclick = () => { document.querySelectorAll('#detail .tab').forEach(x => x.classList.toggle('on', x === t)); document.querySelectorAll('#detail .pane').forEach(p => p.hidden = p.dataset.pane !== t.dataset.tab); });
   $('#openEditor').onclick = () => { location.href = `/editor?id=${id}`; };
   $('#stopJob').onclick = async () => { if (!confirm('Dừng dự án đang chạy?')) return; $('#stopJob').disabled = true; try { await api(`/api/jobs/${id}/stop`, {method: 'POST'}); } catch (e) { alert(e.message); } $('#stopJob').disabled = false; refresh(); };
+  $('#resumeJob').onclick = async () => { $('#resumeJob').disabled = true; try { await api(`/api/jobs/${id}/resume`, {method: 'POST'}); } catch (e) { alert(e.message); } $('#resumeJob').disabled = false; lastVideoState = null; refresh(); };
   $('#saveRender').onclick = async () => { try { await api(`/api/jobs/${id}/props`, {method: 'PUT', headers: {'content-type': 'application/json'}, body: JSON.stringify(readEditor())}); await api(`/api/jobs/${id}/render`, {method: 'POST'}); refresh(); } catch (e) { alert(e.message); } };
   loadJobs(); refresh();
 }
@@ -1064,6 +1066,8 @@ async function refresh() {
   }
   $('#saveRender').disabled = j.status === 'running';
   $('#stopJob').hidden = j.status !== 'running';
+  $('#resumeJob').hidden = !['error', 'stopped'].includes(j.status);
+  $('#resumeJob').textContent = j.status === 'error' ? '↻ Chạy lại từ chỗ lỗi' : '▶ Tiếp tục';
   if (j.hasProps && !props) { props = await api(`/api/jobs/${id}/props`); fillEditor(); $('#editor').hidden = false; }
   if (j.status === 'running') timer = setTimeout(refresh, 2000); else loadJobs();
 }
