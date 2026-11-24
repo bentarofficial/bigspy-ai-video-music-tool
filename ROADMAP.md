@@ -64,7 +64,7 @@ Ghi chú: các mục cũ về v1.0.4 và README đã được đối chiếu, c�
 - [ ] **Xuất video bằng ffmpeg trực tiếp** cho timeline đơn giản (cắt, ghép, chữ, nhạc) để nhanh gần CapCut. Remotion hiện chỉ ~5–6 khung/giây ở 1080p (máy không có GPU NVIDIA). Việc lớn, làm khi người dùng yêu cầu.
 
 ### Cần kiểm tra
-- [ ] **Nút "⬇ Tải đoạn nhạc"** (`/api/cut-audio`): code xong nhưng chưa kiểm tra trên app thật sau khi khởi động lại server (lúc thử trả 404 vì server cũ).
+- [ ] **Nút "⬇ Tải đoạn nhạc"** (`/api/cut-audio`): endpoint đã trả WAV hợp lệ với mẫu giả lập; vẫn cần bấm thử trong app sau khi khởi động lại server.
 - [ ] **Chạy lại từ chỗ lỗi / Tiếp tục** (v1.0.36, `resume_job` trong `server/app.py`): chưa xác nhận người dùng chạy lại thành công dự án "Tình như lá bay xa".
 - [ ] **Render tự thử lại với ít luồng hơn**: mới thử với đúng clip lỗi, chưa thử trên nhiều dự án.
 - [ ] **Phụ đề chill chạy theo ký tự** (Chữ chảy, Hiện trước vài chữ, Sáng dần, Sương mờ – v1.0.17): mới xem trong Editor, chưa xuất video hoàn chỉnh.
