@@ -306,6 +306,7 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
             <button type="button" class="ghost" id="suggest">✨ Gợi ý đoạn hay</button>
             <button type="button" class="ghost" id="playCut">▶ Nghe thử</button>
             <button type="button" class="ghost" id="clearCut">Cả bài</button>
+            <button type="button" class="ghost" id="dlCut" title="Tải riêng đoạn nhạc đã chọn, giữ nguyên định dạng và chất lượng file gốc">⬇ Tải đoạn nhạc</button>
           </div>
           <div class="hint" id="cutInfo"></div>
         </div>
@@ -609,6 +610,21 @@ $('#suggest').onclick = () => {
   cs.value = (bi / 2).toFixed(1); ce.value = Math.min(buf.duration, bi / 2 + L).toFixed(1); updateCut();
 };
 $('#clearCut').onclick = () => { cs.value = ce.value = ''; updateCut(); };
+// Tải riêng đoạn nhạc đã chọn (chưa chọn = cả bài), cùng định dạng và chất lượng với file gốc
+$('#dlCut').onclick = async () => {
+  const f = file.files[0]; if (!f) return alert('Chọn file nhạc trước');
+  const btn = $('#dlCut'), old = btn.textContent; btn.disabled = true; btn.textContent = '⏳ Đang cắt…';
+  try {
+    const fd = new FormData(); fd.set('audio', f); fd.set('start', +cs.value || 0); fd.set('end', +ce.value || 0);
+    const r = await fetch('/api/cut-audio', {method: 'POST', body: fd});
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+    const cd = r.headers.get('content-disposition') || '';
+    const m = cd.match(/filename\*=utf-8''([^;]+)/i) || cd.match(/filename="?([^";]+)/i);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob());
+    a.download = m ? decodeURIComponent(m[1]) : f.name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  } catch (e) { alert('Không tải được: ' + e.message); }
+  finally { btn.disabled = false; btn.textContent = old; }
+};
 // Khoảng nghe thử: đoạn đã chọn, hoặc cả bài nếu chưa chọn
 function playRange() { const s = +cs.value || 0; return [s, +ce.value > s ? +ce.value : buf.duration]; }
 // Phát từ vị trí `from` tới hết đoạn. Kéo thanh đầu phát (lúc đang nghe) để nhảy tới chỗ khác.

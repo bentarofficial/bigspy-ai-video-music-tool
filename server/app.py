@@ -274,6 +274,42 @@ def delete_logo(name: str):
     return {"ok": True}
 
 
+# ---------- cắt nhạc: tải riêng đoạn đã chọn, giữ nguyên định dạng và chất lượng gốc ----------
+@app.post("/api/cut-audio")
+async def cut_audio(audio: UploadFile = File(...), start: float = Form(0.0), end: float = Form(0.0)):
+    from starlette.background import BackgroundTask
+    from musicvideo.audio import FFMPEG
+
+    name = audio.filename or "audio.wav"
+    try:
+        name = name.encode("latin-1").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    ext = Path(name).suffix.lower() or ".wav"
+    tmp = Path(tempfile.mkdtemp(prefix="cut-"))
+    src, dst = tmp / f"src{ext}", tmp / f"out{ext}"
+    src.write_bytes(await audio.read())
+    cmd = [FFMPEG, "-y", "-loglevel", "error"]
+    if start > 0:
+        cmd += ["-ss", f"{start:.3f}"]
+    cmd += ["-i", str(src)]
+    if end > start:
+        cmd += ["-t", f"{end - start:.3f}"]
+    # -c copy: không mã hoá lại -> WAV ra WAV, MP3 ra MP3, chất lượng y hệt file gốc
+    cmd += ["-map", "0:a", "-map_metadata", "0", "-c", "copy", str(dst)]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode or not dst.exists():
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise HTTPException(500, "không cắt được nhạc: " + (r.stderr or "")[-300:])
+
+    def fmt(t: float) -> str:
+        return f"{int(t // 60)}m{int(t % 60):02d}"
+
+    label = f" ({fmt(start)}-{fmt(end)})" if end > start else ""
+    return FileResponse(dst, filename=f"{Path(name).stem}{label}{ext}",
+                        background=BackgroundTask(shutil.rmtree, tmp, ignore_errors=True))
+
+
 # ---------- job ----------
 @app.post("/api/jobs")
 async def create_job(
