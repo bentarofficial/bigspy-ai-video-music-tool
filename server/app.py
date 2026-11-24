@@ -318,6 +318,9 @@ async def create_job(
     lang: str = Form(""), orientation: str = Form("portrait"), subtitle_mode: str = Form("karaoke"),
     title_animation: str = Form("zoom"), title_color: str = Form("#ffffff"), title_font: str = Form(""), sub_font: str = Form(""),
     sub_color: str = Form("#ffffff"), sub_highlight: str = Form("#ffd23f"),
+    sub_stroke: str = Form("#000000"), sub_stroke_width: float = Form(6), sub_size: float = Form(6.5),
+    sub_position: str = Form("bottom"), sub_upper: str = Form("0"), sub_lookahead: int = Form(2),
+    sub_in_dur: float = Form(0.3), sub_out_dur: float = Form(0.15),
     title_out: str = Form("fade"), sub_in: str = Form(""), sub_out: str = Form("fade"), theme: str = Form(""),
     whisper_model: str = Form("small"), no_lyrics: bool = Form(False),
     scene_length: float = Form(4.0),
@@ -358,6 +361,12 @@ async def create_job(
     if font_ok(sub_font): args += ["--sub-font", sub_font]
     if re.fullmatch(r"#[0-9a-fA-F]{6}", sub_color): args += ["--sub-color", sub_color]
     if re.fullmatch(r"#[0-9a-fA-F]{6}", sub_highlight): args += ["--sub-highlight", sub_highlight]
+    if re.fullmatch(r"#[0-9a-fA-F]{6}", sub_stroke): args += ["--sub-stroke", sub_stroke]
+    args += ["--sub-stroke-width", str(max(0.0, min(16.0, sub_stroke_width))), "--sub-size", str(max(3.0, min(15.0, sub_size))),
+             "--sub-lookahead", str(max(1, min(6, sub_lookahead))),
+             "--sub-in-dur", str(max(0.1, min(2.0, sub_in_dur))), "--sub-out-dur", str(max(0.1, min(2.0, sub_out_dur)))]
+    if sub_position in {"bottom", "center", "top"}: args += ["--sub-position", sub_position]
+    if sub_upper == "1": args += ["--sub-upper"]
     for flag, v in (("--title-out", title_out), ("--sub-in", sub_in), ("--sub-out", sub_out)):
         if re.fullmatch(r"[a-z\-]{1,20}", v): args += [flag, v]
     if title: args += ["--title", title]

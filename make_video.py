@@ -60,7 +60,7 @@ def main() -> None:
     p.add_argument("--ai", default="", choices=["", "claude", "codex"], help="chỉ dùng CLI này (không dự phòng)")
     p.add_argument("--claude-effort", default="", choices=["", *keywords.EFFORTS], help="mức suy nghĩ của Claude")
     p.add_argument("--theme", help="chủ đề hình ảnh, ví dụ 'ocean, sunset, city night'")
-    p.add_argument("--subtitle-mode", choices=["karaoke", "preview", "full"], default="karaoke")
+    p.add_argument("--subtitle-mode", choices=["karaoke", "preview", "full", "glow", "mist", "p0"], default="karaoke")
     p.add_argument("--title-animation", default="zoom", help="hiệu ứng xuất hiện tên bài (id trong remotion/src/anim.ts)")
     p.add_argument("--title-out", default="fade", help="hiệu ứng biến mất tên bài")
     p.add_argument("--sub-in", default="", help="hiệu ứng xuất hiện mỗi câu phụ đề (trống = mặc định)")
@@ -70,6 +70,14 @@ def main() -> None:
     p.add_argument("--sub-font", default="Arial Black, Arial, sans-serif", help="phông phụ đề")
     p.add_argument("--sub-color", default="#ffffff", help="màu chữ phụ đề")
     p.add_argument("--sub-highlight", default="#ffd23f", help="màu tô karaoke")
+    p.add_argument("--sub-stroke", default="#000000", help="màu viền phụ đề")
+    p.add_argument("--sub-stroke-width", type=float, default=6, help="độ dày viền phụ đề")
+    p.add_argument("--sub-size", type=float, default=6.5, help="cỡ chữ phụ đề, %% cạnh ngắn khung hình")
+    p.add_argument("--sub-position", default="bottom", choices=["bottom", "center", "top"])
+    p.add_argument("--sub-upper", action="store_true", help="viết hoa phụ đề")
+    p.add_argument("--sub-lookahead", type=int, default=2, help="số chữ hiện trước (kiểu preview)")
+    p.add_argument("--sub-in-dur", type=float, default=0.3, help="thời lượng hiệu ứng vào (s)")
+    p.add_argument("--sub-out-dur", type=float, default=0.15, help="thời lượng hiệu ứng ra (s)")
     p.add_argument("--color-filter", default="none", help="bộ lọc màu phủ toàn video (id trong remotion/src/colorFilter.tsx, ví dụ natural, cinematic, kodak, bw)")
     p.add_argument("--filter-intensity", type=float, default=1.0, help="cường độ bộ lọc 0..1")
     p.add_argument("--render", action="store_true", help="render ra MP4 ngay sau khi chuẩn bị xong")
@@ -192,11 +200,13 @@ def main() -> None:
         "scenes": out_scenes,
         "lines": lines,
         "subtitle": {
-            "mode": a.subtitle_mode, "lookahead": 2, "leadIn": 0.6,
-            "fontFamily": a.sub_font, "fontSize": round(base * 0.065),
-            "color": a.sub_color, "highlightColor": a.sub_highlight, "strokeColor": "#000000", "strokeWidth": 6,
-            "position": "bottom", "uppercase": False,
+            "mode": "preview" if a.subtitle_mode == "p0" else a.subtitle_mode,
+            "lookahead": 0 if a.subtitle_mode == "p0" else a.sub_lookahead, "leadIn": 0.6,
+            "fontFamily": a.sub_font, "fontSize": round(base * a.sub_size / 100),
+            "color": a.sub_color, "highlightColor": a.sub_highlight, "strokeColor": a.sub_stroke, "strokeWidth": a.sub_stroke_width,
+            "position": a.sub_position, "uppercase": a.sub_upper,
             **({"animIn": a.sub_in} if a.sub_in else {}), "animOut": a.sub_out,
+            "inDur": a.sub_in_dur, "outDur": a.sub_out_dur,
         },
         "title": {
             "enabled": bool(a.title), "text": a.title, "subtext": a.subtitle_text,
