@@ -199,7 +199,7 @@ def main() -> None:
         q_file.write_text(json.dumps(queries, ensure_ascii=False), encoding="utf-8")
 
     print("⑥ Tìm & tải clip từ Pixabay")
-    px = Pixabay(key, CACHE_DIR, CLIPS_DIR)
+    px = Pixabay(key, CACHE_DIR, CLIPS_DIR, project_id=job)
     used: set[int] = set()
     portrait = a.orientation == "portrait"
     out_scenes = []
@@ -209,6 +209,7 @@ def main() -> None:
         clip_src, clip_dur, credit = "", dur, ""
         if hit:
             used.add(hit["id"])
+            px.record_project(used)
             path = px.download(hit)
             clip_src = path.relative_to(PUBLIC_DIR).as_posix()
             clip_dur = float(hit.get("duration") or dur)

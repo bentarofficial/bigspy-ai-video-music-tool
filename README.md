@@ -86,6 +86,8 @@ Mở dự án bằng **Editor** tại `/editor` để sắp xếp clip trên tim
 
 Các API của Editor gồm `POST /api/projects`, `GET/PUT /api/jobs/{id}/timeline`, `POST /api/jobs/{id}/media`, `POST /api/jobs/{id}/ai-edit`, `POST /api/jobs/{id}/fix-lyrics`, `POST /api/jobs/{id}/export`, `GET /api/jobs/{id}/export-file`, `POST /api/jobs/{id}/open-export` và `POST /api/jobs/{id}/cleanup`. Kết nối CLI AI và Pixabay được quản lý qua `/api/settings` và `/api/settings/{service}/{action}`.
 
+Khi tạo video mới, app ưu tiên clip Pixabay chưa xuất hiện trong 10 dự án gần nhất. Nếu đã sửa timeline sau lần xuất trước, danh sách dự án sẽ nhắc “Có chỉnh sửa chưa xuất”; thao tác gửi TikTok sẽ tự xuất lại MP4 trước khi tải lên.
+
 Từ **v1.0.4**, Editor có tab AI để sửa timeline bằng câu lệnh, khôi phục lần sửa trước hoặc về ban đầu, tự dọn file tạm sau khi xuất và hiện đầy đủ tên clip khi di chuột trên timeline. Các bản mới hơn bổ sung sửa lời phụ đề, nhiều kiểu chuyển cảnh và bộ lọc màu.
 
 ## Dùng bằng dòng lệnh

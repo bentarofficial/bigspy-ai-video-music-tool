@@ -5,33 +5,39 @@ và tải clip về máy một lần, dùng lại cho các video sau.
 """
 import hashlib
 import json
+import os
+import random
+import re
 import subprocess
 import time
 from pathlib import Path
 
 import requests
+from .config import DATA_DIR, OUTPUT_DIR
 
 API = "https://pixabay.com/api/videos/"
 CACHE_TTL = 24 * 3600
 
 
 class Pixabay:
-    def __init__(self, api_key: str, cache_dir: Path, clips_dir: Path):
+    def __init__(self, api_key: str, cache_dir: Path, clips_dir: Path, project_id: str = ""):
         self.key = api_key
+        self.project_id = project_id
+        self.history_file = DATA_DIR / "pixabay_history.json"
         self.cache_dir = cache_dir / "pixabay"
         self.clips_dir = clips_dir
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.clips_dir.mkdir(parents=True, exist_ok=True)
 
-    def search(self, query: str, per_page: int = 50) -> list[dict]:
+    def search(self, query: str, per_page: int = 50, page: int = 1) -> list[dict]:
         query = query[:100]
-        f = self.cache_dir / (hashlib.md5(query.lower().encode()).hexdigest() + ".json")
+        f = self.cache_dir / (hashlib.md5(query.lower().encode()).hexdigest() + (f"-{page}" if page > 1 else "") + ".json")
         if f.exists() and time.time() - f.stat().st_mtime < CACHE_TTL:
             return json.loads(f.read_text(encoding="utf-8"))
         last_err = None
         for attempt in range(6):
             try:
-                r = requests.get(API, params={"key": self.key, "q": query, "per_page": per_page,
+                r = requests.get(API, params={"key": self.key, "q": query, "per_page": per_page, "page": page,
                                               "safesearch": "true", "video_type": "film"}, timeout=30)
             except requests.exceptions.RequestException as e:
                 # mạng chập chờn / SSL EOF / bị ngắt kết nối -> chờ rồi thử lại
@@ -73,16 +79,58 @@ class Pixabay:
                 time.sleep(2 * (attempt + 1))
         return None
 
+    def _history(self) -> list[dict]:
+        if self.history_file.exists():
+            try:
+                return json.loads(self.history_file.read_text(encoding="utf-8"))[-11:]
+            except (OSError, ValueError, TypeError):
+                pass
+        # Lần đầu nâng cấp: lấy 10 dự án có props mới nhất để tránh lặp ngay.
+        projects = sorted(OUTPUT_DIR.glob("*/props.json"), key=lambda f: f.stat().st_mtime, reverse=True)[:10]
+        history = []
+        for f in reversed(projects):
+            try:
+                props = json.loads(f.read_text(encoding="utf-8"))
+                ids = {int(m.group(1)) for s in props.get("scenes", [])
+                       if (m := re.search(r"pixabay_(\d+)", str(s.get("src") or "")))}
+                history.append({"job": f.parent.name, "ids": sorted(ids)})
+            except (OSError, ValueError, TypeError):
+                continue
+        return history
+
+    def recent_ids(self) -> set[int]:
+        recent = [p for p in self._history() if p.get("job") != self.project_id][-10:]
+        return {int(i) for p in recent for i in p.get("ids", [])}
+
+    def record_project(self, ids: set[int]) -> None:
+        if not self.project_id or not ids:
+            return
+        history = [p for p in self._history() if p.get("job") != self.project_id]
+        history.append({"job": self.project_id, "ids": sorted(ids)})
+        tmp = self.history_file.with_suffix(f".{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(history[-11:]), encoding="utf-8")
+        tmp.replace(self.history_file)
+
     def find(self, query: str, min_duration: float, portrait: bool, used: set[int]) -> dict | None:
-        """Thử câu truy vấn đầy đủ, rồi rút gọn dần nếu không có kết quả."""
+        """Ưu tiên clip chưa dùng trong 10 dự án gần nhất, rồi mới cho phép dùng lại."""
         words = query.split()
+        recent = self.recent_ids()
+        fallback, fresh_candidates = [], []
+        def suitable(h):
+            v = h.get("videos", {}).get("medium") or h.get("videos", {}).get("large") or {}
+            return h.get("duration", 0) >= min_duration and (v.get("height", 0) > v.get("width", 1)) == portrait
         for q in [query] + [" ".join(words[:k]) for k in range(len(words) - 1, 0, -1)] + ["nature"]:
-            hits = self.search(q)
-            if hits:
-                best = self._rank(hits, min_duration, portrait, used)
-                if best:
-                    return best
-        return None
+            for page in (1, 2):
+                hits = self.search(q, page=page)
+                fallback.extend(hits)
+                fresh = [h for h in hits if h["id"] not in used and h["id"] not in recent]
+                fresh_candidates.extend(fresh)
+                good = [h for h in fresh if suitable(h)]
+                if good:
+                    return self._rank(good, min_duration, portrait, used)
+                if len(hits) < 50:
+                    break
+        return self._rank(fresh_candidates or fallback, min_duration, portrait, used)
 
     @staticmethod
     def _rank(hits: list[dict], min_duration: float, portrait: bool, used: set[int]) -> dict | None:
@@ -95,7 +143,12 @@ class Pixabay:
                 is_portrait == portrait,             # đúng khổ dọc/ngang
                 h.get("downloads", 0) + 20 * h.get("likes", 0),
             )
-        return max(hits, key=score) if hits else None
+        if not hits:
+            return None
+        ranked = sorted(hits, key=score, reverse=True)
+        best = score(ranked[0])[:3]
+        pool = [h for h in ranked if score(h)[:3] == best][:10]
+        return random.choice(pool)
 
     def download(self, hit: dict) -> Path:
         """Tải clip rồi chuẩn hóa. Trả về file đã chuẩn hóa (dùng lại nếu đã có)."""

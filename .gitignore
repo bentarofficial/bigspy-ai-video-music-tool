@@ -22,3 +22,4 @@ exports/
 start.bat
 stop.bat
 tiktok_token.json
+pixabay_history.json

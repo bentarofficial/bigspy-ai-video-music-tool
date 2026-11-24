@@ -414,6 +414,7 @@ def list_jobs():
                 m = read_meta(d)
                 m["status"] = status_of(d.name, d)
                 m["hasVideo"] = (d / "video.mp4").exists()
+                m["hasUnexportedEdits"] = _has_unexported_edits(d)
                 out.append(m)
     return sorted(out, key=lambda m: m.get("created", 0), reverse=True)
 
@@ -423,7 +424,13 @@ def get_job(job_id: str):
     d = job_dir(job_id)
     log = (d / "log.txt").read_text(encoding="utf-8", errors="replace") if (d / "log.txt").exists() else ""
     return {**read_meta(d), "status": status_of(job_id, d), "log": log[-6000:],
-            "hasVideo": (d / "video.mp4").exists(), "hasProps": (d / "props.json").exists()}
+            "hasVideo": (d / "video.mp4").exists(), "hasProps": (d / "props.json").exists(),
+            "hasUnexportedEdits": _has_unexported_edits(d)}
+
+
+def _has_unexported_edits(d: Path) -> bool:
+    timeline, video = d / "timeline.json", d / "video.mp4"
+    return timeline.is_file() and video.is_file() and timeline.stat().st_mtime_ns > video.stat().st_mtime_ns
 
 
 @app.get("/api/jobs/{job_id}/video")
@@ -852,7 +859,7 @@ def ai_edit(job_id: str, body: dict):
                 continue
             pixabay_count += 1
             try:
-                ops.append(pixabay_add_op(tl, o))
+                ops.append(pixabay_add_op(job_id, tl, o))
             except Exception as e:
                 reply = (reply + f" Không thêm được clip Pixabay: {e}").strip()
         elif o.get("op") in {"update", "delete", "add", "timeline"}:
@@ -860,7 +867,7 @@ def ai_edit(job_id: str, body: dict):
     return {"reply": reply, "ops": ops}
 
 
-def pixabay_add_op(tl: dict, request: dict) -> dict:
+def pixabay_add_op(job_id: str, tl: dict, request: dict) -> dict:
     """Tìm, tải và chuẩn hoá một clip để Editor có thể thêm trực tiếp vào timeline."""
     from musicvideo.pixabay import Pixabay
     load_env()
@@ -874,10 +881,11 @@ def pixabay_add_op(tl: dict, request: dict) -> dict:
     dur = max(1.0, min(float(request.get("dur") or 5), 60.0))
     used = {int(m.group(1)) for c in tl.get("clips", [])
             if (m := re.search(r"pixabay_(\d+)", str(c.get("src") or "")))}
-    px = Pixabay(key, CACHE_DIR, CLIPS_DIR)
+    px = Pixabay(key, CACHE_DIR, CLIPS_DIR, project_id=job_id)
     hit = px.find(query, dur, tl.get("height", 0) > tl.get("width", 0), used)
     if not hit:
         raise ValueError(f"Không tìm thấy clip cho '{query}'")
+    px.record_project(used | {int(hit["id"])})
     src = px.download(hit).relative_to(PUBLIC_DIR).as_posix()
     source_dur = float(hit.get("duration") or dur)
     media = {"id": _uid(), "name": f"Pixabay: {query}", "src": src, "type": "video", "duration": source_dur}
@@ -1233,7 +1241,7 @@ def send_tiktok(job_id: str, body: dict | None = None):
     if not video.exists():
         raise HTTPException(400, "Dự án chưa có video — hãy xuất video trước.")
     cur = read_meta(d).get("tiktok") or {}
-    if cur.get("state") in {"starting", "uploading", "processing"} and time.time() - cur.get("at", 0) < 900:
+    if cur.get("state") in {"exporting", "starting", "uploading", "processing"} and time.time() - cur.get("at", 0) < 900:
         raise HTTPException(409, "Video này đang được gửi lên TikTok.")
     tiktok.access_token()  # báo lỗi ngay nếu chưa kết nối
     caption = str((body or {}).get("caption", "")).strip()[:2200]
@@ -1247,6 +1255,15 @@ def send_tiktok(job_id: str, body: dict | None = None):
 
     def run():
         try:
+            if _has_unexported_edits(d):
+                set_state({"state": "exporting"})
+                tl = json.loads((d / "timeline.json").read_text(encoding="utf-8"))
+                export_timeline(job_id, {"timeline": tl, "options": {"format": "mp4"}})
+                if procs[job_id].wait() != 0:
+                    raise RuntimeError("Xuất lại video thất bại. Mở dự án để xem log và thử xuất lại.")
+                status_of(job_id, d)
+                cleanup_job(job_id)
+            set_state({"state": "starting"})
             tiktok.upload(video, set_state)
         except Exception as e:  # noqa: BLE001
             msg = e.detail if isinstance(e, HTTPException) else str(e)

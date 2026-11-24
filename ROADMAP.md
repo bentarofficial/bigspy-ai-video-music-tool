@@ -9,7 +9,7 @@
 - [x] **Nút ◆ chuyển cảnh**: đã chuyển sang màu trắng đồng bộ.
 - [x] **README về Editor**: bổ sung tính năng, API, tìm lời và cấu trúc thư mục.
 - [x] **Xoá `server/static/index.backup.html`**: không có tham chiếu sử dụng.
-- [x] **v1.0.4**: đã có tag phát hành; phiên bản code hiện tại là v1.0.27.
+- [x] **v1.0.4**: đã có tag phát hành; phiên bản code hiện tại là v1.0.37.
 - [x] **README về tính năng mới**: model Claude/Codex, thư viện logo và 4 chuyển cảnh mượt.
 - [x] **Ô màu trong Editor**: ô nhỏ cùng mã hex có thể nhập.
 - [x] **Bộ lọc màu trong Editor**: logo được loại khỏi bộ lọc toàn video, kể cả dự án cũ có clip ảnh tên `Logo`.
@@ -49,11 +49,11 @@
   3. **Cài đặt**: thêm một khối `.svc` trong bảng Cài đặt để nhập key và Kết nối, kèm link hướng dẫn trong `docs/` (GitHub Pages).
   4. **Caption**: dùng lại `POST /api/jobs/{id}/tiktok/caption` (AI viết từ tên bài + lời) hoặc tách thành endpoint chung nếu nền tảng mới cần độ dài hoặc hashtag khác.
   5. Video nguồn là `output/<job>/video.mp4` (bản H.264 xuất từ Editor được chép vào đây).
-- [ ] **Tự xuất lại video trước khi đăng nếu có chỉnh sửa chưa xuất**: hiện sửa trong Editor mà không bấm Xuất video, rồi đăng từ menu ⋯, thì video gửi đi là bản `video.mp4` cũ (không có chỉnh sửa, không cảnh báo). Cách làm: so thời gian sửa `timeline.json` với `video.mp4`; nếu timeline mới hơn thì tự render H.264 rồi mới đăng, đồng thời trang chủ hiện nhắc "Có chỉnh sửa chưa xuất".
-- [ ] **Cảnh quay không lặp giữa các video** (yêu cầu của người dùng): một clip đã dùng thì **khoảng 10 video sau mới được dùng lại**. Hiện video nào cũng trùng 1–2 cảnh với video trước, vì `Pixabay._rank` (`musicvideo/pixabay.py`) luôn chọn clip nhiều lượt tải/thích nhất và tập `used` chỉ tránh trùng trong cùng một video. Hướng làm: lưu lịch sử ID clip của 10 dự án gần nhất (file chung trong `DATA_DIR`), loại các clip đó khi chọn (chỉ dùng lại nếu hết lựa chọn); chọn ngẫu nhiên trong nhóm điểm cao; lấy thêm trang kết quả 2–3; cho AI sinh từ khoá phong phú hơn.
+- [x] **Tự xuất lại video trước khi đăng nếu có chỉnh sửa chưa xuất**: so thời gian sửa `timeline.json` với `video.mp4`, hiển thị nhắc trên trang chủ và xuất lại H.264 trước khi gửi TikTok.
+- [x] **Cảnh quay không lặp giữa các video**: lưu ID clip trong `pixabay_history.json` ở `DATA_DIR`, ưu tiên loại clip của 10 dự án trước, thử thêm trang kết quả thứ hai và chọn ngẫu nhiên trong nhóm clip phù hợp. Chỉ dùng lại clip cũ khi không tìm được clip mới.
 ## Rà soát các phiên làm việc (24/11/2026, bản hiện tại v1.0.37)
 
-Ghi chú: mục "Phát hành bản mới (v1.0.4)" ở trên đã lỗi thời – app đã lên v1.0.37; phần README / ghi chú phát hành vẫn cần cập nhật.
+Ghi chú: các mục cũ về v1.0.4 và README đã được đối chiếu, cập nhật ở đầu roadmap. Bản GitHub trước thay đổi này là v1.0.37.
 
 ### Chưa làm
 - [ ] **Hàng chờ dự án + ưu tiên xuất video** (đã đề xuất, người dùng chưa chốt làm): hiện bấm Tạo video là chạy ngay, nhiều dự án chạy song song làm máy rất nặng; xuất video từ Editor cũng chạy song song. Hướng làm:

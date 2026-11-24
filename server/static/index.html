@@ -63,6 +63,7 @@ aside{background:rgba(12,12,14,.75);backdrop-filter:blur(20px);border-right:1px 
 .jinfo{flex:1;min-width:0;display:flex;flex-direction:column}
 .jname{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500}
 .jdate{font-size:11px;color:var(--mute);line-height:1.3}
+.jdirty{font-size:11px;color:var(--warn);line-height:1.3}
 .job{position:relative}
 .jmore{flex:none;width:22px;height:22px;border:0;border-radius:6px;background:transparent;color:var(--mute);cursor:pointer;font-size:15px;line-height:1;opacity:0;transition:.15s}
 .job:hover .jmore,.job.sel .jmore,.jmore.open{opacity:1}.jmore:hover,.jmore.open{background:rgba(255,255,255,.08);color:var(--text)}
@@ -947,7 +948,7 @@ $('#ttOff').onclick = async () => {
   loadTikTok();
 };
 
-const TT_STATE = {starting: 'Đang chuẩn bị…', uploading: 'Đang tải lên TikTok', processing: 'TikTok đang xử lý video…',
+const TT_STATE = {exporting: 'Đang xuất lại video với chỉnh sửa mới…', starting: 'Đang chuẩn bị…', uploading: 'Đang tải lên TikTok', processing: 'TikTok đang xử lý video…',
   inbox: '✓ Đã vào hộp thư TikTok. Mở app TikTok trên điện thoại → bấm thông báo → dán caption → Đăng hoặc Lên lịch.',
   posted: '✓ Video đã được đăng trên TikTok.', error: 'Lỗi'};
 async function tiktokDialog(j) {
@@ -970,12 +971,12 @@ async function tiktokDialog(j) {
     st.hidden = false;
     st.className = 'ttst' + (s.state === 'error' ? ' err' : ['inbox', 'posted'].includes(s.state) ? ' ok' : '');
     st.textContent = s.state === 'error' ? '⚠ ' + (s.error || 'Lỗi không rõ') : (TT_STATE[s.state] || s.state) + (s.state === 'uploading' && s.progress != null ? ` ${s.progress}%` : '') + (s.note ? ' ' + s.note : '');
-    const busy = ['starting', 'uploading', 'processing'].includes(s.state) && !s.note;
+    const busy = ['exporting', 'starting', 'uploading', 'processing'].includes(s.state) && !s.note;
     send.disabled = busy; send.textContent = busy ? 'Đang gửi…' : ['inbox', 'posted'].includes(s.state) ? 'Gửi lại' : 'Gửi lên TikTok';
     if (!busy) clearInterval(poll);
   };
   const watch = () => { clearInterval(poll); poll = setInterval(async () => { try { show(await api(`/api/jobs/${j.id}/tiktok`)); } catch {} }, 2000); };
-  if (info.state && Date.now() / 1000 - (info.at || 0) < 86400) { show(info); if (['starting', 'uploading', 'processing'].includes(info.state)) watch(); }
+  if (info.state && Date.now() / 1000 - (info.at || 0) < 86400) { show(info); if (['exporting', 'starting', 'uploading', 'processing'].includes(info.state)) watch(); }
   w.onclick = e => { if (e.target === w) close(); };
   w.querySelector('[data-a=close]').onclick = close;
   const aiBtn = w.querySelector('[data-a=ai]');
@@ -1030,7 +1031,7 @@ async function loadJobs() {
   for (const j of jobs) {
     const el = document.createElement('div');
     el.className = 'job' + (j.id === current ? ' sel' : '');
-    el.innerHTML = `<span class="jthumb">♪</span><span class="jinfo"><span class="jname"></span><span class="jdate"></span></span><span class="dot ${j.status}" title="${label[j.status] || j.status}"></span><button class="jmore" title="Tuỳ chọn">⋯</button>`;
+    el.innerHTML = `<span class="jthumb">♪</span><span class="jinfo"><span class="jname"></span><span class="jdate"></span>${j.hasUnexportedEdits ? '<span class="jdirty">Có chỉnh sửa chưa xuất</span>' : ''}</span><span class="dot ${j.status}" title="${label[j.status] || j.status}"></span><button class="jmore" title="Tuỳ chọn">⋯</button>`;
     el.querySelector('.jname').textContent = (j.title || j.id).replace(/\.(wav|mp3|m4a|flac|ogg|aac)$/i, '');
     if (Number.isFinite(Number(j.created)) && Number(j.created) > 0) {
       el.querySelector('.jdate').textContent = new Date(Number(j.created) * 1000).toLocaleString('vi-VN', {dateStyle: 'short', timeStyle: 'short'});
