@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from make_video import slugify  # noqa: E402
-from musicvideo.config import CACHE_DIR, EXPORTS_DIR, OUTPUT_DIR, PUBLIC_DIR, REMOTION_DIR, SIZES, UPLOADS_DIR, load_env  # noqa: E402
+from musicvideo.config import CACHE_DIR, CLIPS_DIR, EXPORTS_DIR, OUTPUT_DIR, PUBLIC_DIR, REMOTION_DIR, SIZES, UPLOADS_DIR, load_env  # noqa: E402
 
 UPLOADS = UPLOADS_DIR
 LOGOS = ROOT / "logos"  # thư viện logo kênh, giữ qua các lần mở app / cập nhật
@@ -527,6 +527,7 @@ def resume_job(job_id: str):
         raise HTTPException(409, "job đang chạy")
     args = read_meta(d).get("args")
     if (d / "props.json").exists():  # đã chuẩn bị xong mọi thứ, chỉ còn bước render
+        restore_clips(_props_srcs(d))
         with open(d / "log.txt", "a", encoding="utf-8") as log:
             log.write("\n▶ Tiếp tục: các bước trước đã xong, chỉ render lại.\n")
         spawn(job_id, d, ["--render-only", str(d / "props.json")])
@@ -666,14 +667,85 @@ def create_project(body: dict):
     return {"id": job_id}
 
 
+# ---------- Clip Pixabay đã tải (dùng chung giữa các dự án) ----------
+CLIP_RE = re.compile(r"^clips/pixabay_(\d+)_n\.mp4$")
+
+
+def restore_clips(srcs) -> int:
+    """Tải lại các clip Pixabay đã bị người dùng dọn mà dự án vẫn cần. Trả về số clip đã tải lại."""
+    missing = sorted({int(m.group(1)) for s in srcs if isinstance(s, str) and (m := CLIP_RE.match(s))
+                      and not (PUBLIC_DIR / s).is_file()})
+    if not missing:
+        return 0
+    load_env()
+    key = os.environ.get("PIXABAY_API_KEY", "")
+    if not key:
+        raise HTTPException(400, "Clip của dự án đã bị dọn, cần kết nối Pixabay (Cài đặt) để tải lại.")
+    from musicvideo.pixabay import Pixabay
+    px, n = Pixabay(key, CACHE_DIR, CLIPS_DIR), 0
+    for vid in missing:
+        try:
+            hit = px.by_id(vid)
+            if hit:
+                px.download(hit)
+                n += 1
+        except Exception as e:  # noqa: BLE001 - thiếu 1 clip vẫn mở được dự án
+            print(f"  ⚠ không tải lại được clip {vid}: {e}", flush=True)
+    return n
+
+
+def _tl_srcs(tl: dict) -> set:
+    return {c.get("src") for c in tl.get("clips", [])} | {m.get("src") for m in tl.get("media", [])}
+
+
+def _props_srcs(d: Path) -> set:
+    f = d / "props.json"
+    if not f.exists():
+        return set()
+    return set(re.findall(r'"(clips/pixabay_\d+_n\.mp4)"', f.read_text(encoding="utf-8")))
+
+
+def _any_running() -> bool:
+    return any(p.poll() is None for p in procs.values())
+
+
+@app.get("/api/clips")
+def clips_usage():
+    files = [f for f in CLIPS_DIR.glob("*") if f.is_file()] if CLIPS_DIR.exists() else []
+    return {"count": len(files), "bytes": sum(f.stat().st_size for f in files), "running": _any_running()}
+
+
+@app.post("/api/clips/cleanup")
+def clips_cleanup():
+    if _any_running():
+        raise HTTPException(409, "Đang có video được tạo — đợi xong rồi dọn.")
+    freed = n = 0
+    for f in (CLIPS_DIR.glob("*") if CLIPS_DIR.exists() else []):
+        if f.is_file():
+            try:
+                size = f.stat().st_size
+                f.unlink()
+                freed += size
+                n += 1
+            except OSError:
+                pass  # file đang bị khoá (Editor đang phát) -> bỏ qua
+    return {"freed": freed, "count": n}
+
+
 @app.get("/api/jobs/{job_id}/timeline")
 def get_timeline(job_id: str):
     d = job_dir(job_id)
     f = d / "timeline.json"
     if f.exists():
-        return json.loads(f.read_text(encoding="utf-8"))
-    if (d / "props.json").exists():
-        return timeline_from_props(json.loads((d / "props.json").read_text(encoding="utf-8")))
+        tl = json.loads(f.read_text(encoding="utf-8"))
+    elif (d / "props.json").exists():
+        tl = timeline_from_props(json.loads((d / "props.json").read_text(encoding="utf-8")))
+    else:
+        tl = None
+    if tl is not None:
+        if status_of(job_id, d) != "running":
+            restore_clips(_tl_srcs(tl))
+        return tl
     raise HTTPException(404, "Dự án chưa có dữ liệu để dựng (AI chưa chạy xong?)")
 
 
@@ -904,6 +976,7 @@ def export_timeline(job_id: str, body: dict):
     if not tl.get("clips"):
         raise HTTPException(400, "Timeline trống")
     put_timeline(job_id, tl)
+    restore_clips(_tl_srcs(tl))
 
     fmt = o.get("format", "mp4") if o.get("format") in {"mp4", "hevc", "webm", "mp3"} else "mp4"
     codec, ext = {"mp4": ("h264", ".mp4"), "hevc": ("h265", ".mp4"), "webm": ("vp8", ".webm"), "mp3": ("mp3", ".mp3")}[fmt]

@@ -1290,8 +1290,11 @@ function bindKeys() {
 /* ---------- khởi động ---------- */
 async function init() {
   if (!JOB) { document.body.innerHTML = '<p style="padding:40px">Thiếu ?id= dự án. <a href="/" style="color:#e6e6e9">Về trang chính</a></p>'; return; }
+  // clip đã bị dọn (Cài đặt → Dọn dẹp) được tải lại lúc mở -> có thể mất một lúc
+  const slow = setTimeout(() => toast('⏳ Đang tải lại clip đã dọn cho dự án này…', 120000), 1500);
   try { [TL, META] = await Promise.all([apiCall(`/api/jobs/${JOB}/timeline`), apiCall(`/api/jobs/${JOB}`)]); }
   catch (e) { document.body.innerHTML = `<p style="padding:40px">⚠ ${esc(e.message)} <a href="/" style="color:#e6e6e9">Về trang chính</a></p>`; return; }
+  clearTimeout(slow); $('#toast').hidden = true;
   TL.media ??= []; TL.background ??= '#000000';
   migrateTracks();
   explodeLyrics(); syncLyrics();

@@ -274,6 +274,11 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
       <button class="ghost danger" id="ttOff">Huỷ kết nối</button>
       <button class="ghost" id="ttReset">Đổi Client Key / Secret</button>
     </div>
+    <div class="svc" id="svcClips">
+      <div class="svc-top"><span class="svc-ic">🧹</span><div class="svc-name"><b>Clip đã tải</b><small id="clipSize">…</small></div></div>
+      <button class="ghost" id="clipClean">Dọn dẹp</button>
+      <div class="hint">Xoá các clip Pixabay đã tải về để giải phóng ổ đĩa. Video đã làm không bị ảnh hưởng; mở lại dự án trong Editor thì app tự tải lại clip cần dùng.</div>
+    </div>
     <div class="svc" id="svcUpd">
       <div class="svc-top"><span class="svc-ic">⬆</span><div class="svc-name"><b>Phiên bản</b><small id="updVer"></small></div><span class="pill" id="updPill"></span></div>
       <button class="ghost" id="updCheck">Kiểm tra cập nhật</button>
@@ -772,7 +777,26 @@ function fitSetPop() {
   p.style.height = p.style.maxHeight = Math.max(200, document.querySelector('.setwrap').getBoundingClientRect().top - 6 - top) + 'px';
 }
 window.addEventListener('resize', fitSetPop);
-$('#setBtn').onclick = (e) => { e.stopPropagation(); const p = $('#setPop'); p.hidden = !p.hidden; $('#setBtn').classList.toggle('on', !p.hidden); fitSetPop(); };
+$('#setBtn').onclick = (e) => { e.stopPropagation(); const p = $('#setPop'); p.hidden = !p.hidden; $('#setBtn').classList.toggle('on', !p.hidden); fitSetPop(); if (!p.hidden) loadClips(); };
+// ---- dọn clip Pixabay đã tải ----
+const fmtBytes = b => b >= 1e9 ? (b / 1e9).toFixed(1).replace('.', ',') + ' GB' : Math.round(b / 1e6) + ' MB';
+async function loadClips() {
+  try {
+    const r = await api('/api/clips');
+    $('#clipSize').textContent = r.count ? `${r.count} clip · ${fmtBytes(r.bytes)}` : 'Trống';
+    $('#clipClean').disabled = !r.count || r.running;
+    $('#clipClean').title = r.running ? 'Đang có video được tạo — đợi xong rồi dọn' : '';
+  } catch { $('#clipSize').textContent = ''; }
+}
+$('#clipClean').onclick = async (e) => {
+  e.stopPropagation();
+  if (!confirm(`Xoá toàn bộ clip đã tải (${$('#clipSize').textContent})?
+Video đã làm không bị ảnh hưởng. Mở lại dự án cũ trong Editor thì app sẽ tự tải lại clip cần dùng.`)) return;
+  $('#clipClean').disabled = true;
+  try { const r = await api('/api/clips/cleanup', {method: 'POST'}); alert(`Đã dọn ${r.count} clip, giải phóng ${fmtBytes(r.freed)}.`); }
+  catch (err) { alert(err.message); }
+  loadClips();
+};
 document.addEventListener('click', (e) => { if (!e.target.closest('.setwrap')) { $('#setPop').hidden = true; $('#setBtn').classList.remove('on'); } });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#setPop').hidden = true; $('#setBtn').classList.remove('on'); } });
 // chấm cam trên nút khi cần chú ý: chưa kết nối Pixabay hoặc có bản cập nhật

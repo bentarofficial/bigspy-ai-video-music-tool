@@ -57,6 +57,22 @@ class Pixabay:
                 "hoặc phần mềm diệt virus quét HTTPS, rồi chạy lại.") from last_err
         return []
 
+    def by_id(self, vid: int) -> dict | None:
+        """Lấy lại thông tin 1 clip theo ID (để tải lại clip đã bị dọn)."""
+        for attempt in range(4):
+            try:
+                r = requests.get(API, params={"key": self.key, "id": vid}, timeout=30)
+                if r.status_code == 400:  # clip đã bị gỡ khỏi Pixabay
+                    return None
+                r.raise_for_status()
+                hits = r.json().get("hits", [])
+                return hits[0] if hits else None
+            except requests.exceptions.RequestException:
+                if attempt == 3:
+                    raise
+                time.sleep(2 * (attempt + 1))
+        return None
+
     def find(self, query: str, min_duration: float, portrait: bool, used: set[int]) -> dict | None:
         """Thử câu truy vấn đầy đủ, rồi rút gọn dần nếu không có kết quả."""
         words = query.split()
