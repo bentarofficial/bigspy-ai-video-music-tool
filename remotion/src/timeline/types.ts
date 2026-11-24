@@ -56,6 +56,8 @@ export type Clip = {
 	/** độ dài file nguồn (giây) */
 	srcDur?: number;
 	name?: string;
+	/** Logo phủ lên video, không áp bộ lọc màu toàn video. */
+	isLogo?: boolean;
 	volume?: number;
 	speed?: number;
 	loop?: boolean;

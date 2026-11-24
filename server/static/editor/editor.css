@@ -15,6 +15,9 @@ button{font:inherit;color:inherit;cursor:pointer}
 input,select,textarea{font:inherit;color:var(--text);background:var(--field);border:1px solid var(--line2);border-radius:7px;padding:5px 8px;outline:none;min-width:0}
 input:focus,select:focus,textarea:focus{border-color:var(--acc)}
 input[type=color]{padding:1px;height:28px;width:44px;cursor:pointer}
+.colorf{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line2);border-radius:7px;padding:2px 6px;background:var(--field)}
+.colorf input[type=color]{width:28px;height:24px;flex:none;padding:0;border:0}
+.colorf input[type=text]{width:76px;padding:0;border:0;background:transparent;font:12px Consolas,monospace;text-transform:uppercase}
 input[type=range]{accent-color:var(--acc);padding:0;border:0;background:transparent}
 input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px}
 .grow{flex:1}

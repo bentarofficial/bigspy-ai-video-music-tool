@@ -46,7 +46,7 @@
       <p class="hint">Nhấp để áp dụng cho clip đang chọn, hoặc kéo thả vào chỗ nối giữa 2 clip (nút ◆ trên timeline).</p>
       <div class="row"><label>Thời lượng</label><div class="ctl"><input type="range" id="trDur" min="0.1" max="2" step="0.1" value="0.5"><span id="trDurLb">0.5s</span></div></div>
       <div class="trgrid" id="trgrid"></div>
-      <div class="btnrow"><button class="ghost" id="trAll">Áp dụng cho tất cả chỗ nối</button><button class="ghost" id="trRand">🎲 Ngẫu nhiên</button><button class="ghost danger" id="trNone">Bỏ hết</button></div>
+      <div class="btnrow"><button class="ghost" id="trAll">Áp dụng cho tất cả chỗ nối</button><button class="ghost" id="trRand">🎲 Ngẫu nhiên</button><button class="ghost" id="trRandSmooth">Ngẫu nhiên kiểu mượt</button><button class="ghost" id="trUpgrade">Đổi chuyển cảnh cũ sang mượt</button><button class="ghost danger" id="trNone">Bỏ hết</button></div>
     </div>
   </section>
 
@@ -83,9 +83,9 @@
 <section class="tlwrap">
   <div class="tltools">
     <button class="ib" id="split" title="Tách khối tại đầu phát (S / Ctrl+B) – với câu lời: chia chữ theo giờ hát"><i class="tic" style="color:#f87171">✂</i> Tách</button>
-    <button class="ib" id="del" title="Xoá (Delete)"><i class="tic" style="color:#fb7185">🗑</i> Xoá</button>
+    <button class="ib" id="del" title="Xoá (Delete)"><i class="tic" style="color:#fb7185">✕</i> Xoá</button>
     <button class="ib" id="dup" title="Nhân bản (Ctrl+D)"><i class="tic" style="color:#60a5fa">⧉</i></button>
-    <button class="ib" id="tbGroup" title="Nhóm các khối đang chọn (Ctrl+G) – Ctrl/Shift + nhấp để chọn nhiều"><i class="tic" style="color:#34d399">🔗</i> Nhóm</button>
+    <button class="ib" id="tbGroup" title="Nhóm các khối đang chọn (Ctrl+G) – Ctrl/Shift + nhấp để chọn nhiều"><i class="tic" style="color:#34d399">⌁</i> Nhóm</button>
     <button class="ib" id="tbUngroup" title="Bỏ nhóm (Ctrl+Shift+G)"><i class="tic" style="color:#fbbf24">⛓</i> Bỏ nhóm</button>
     <span class="sep"></span>
     <button class="ib" id="tbAlignScenes" title="Dời các điểm chuyển cảnh của Video chính ra khoảng nghỉ giữa hai câu hát – không còn chuyển cảnh khi đang hát dở câu"><i class="tic" style="color:#f472b6">⇹</i> Căn cảnh theo câu</button>
@@ -93,7 +93,7 @@
     <button class="ib" id="tbAddCover" title="Khung làm mờ để che phụ đề / logo có sẵn trong clip"><i class="tic" style="color:#38bdf8">＋</i> Lớp che mờ</button>
     <button class="ib" id="tbAddText" title="Chữ / tiêu đề tự nhập"><i class="tic" style="color:#facc15">＋</i> Chữ</button>
     <span class="sep"></span>
-    <button class="ib on" id="snap" title="Hút dính (N)"><i class="tic" style="color:#f43f5e">🧲</i></button>
+    <button class="ib on" id="snap" title="Hút dính (N)"><i class="tic" style="color:#f43f5e">⊣</i></button>
     <button class="ib" id="ripple" title="Xoá tự dồn: xoá clip thì các clip phía sau cùng track lùi lại lấp chỗ trống"><i class="tic" style="color:#2dd4bf">⇤</i> Dồn</button>
     <span class="sep"></span>
     <button class="ib" id="detach" title="Tách âm thanh khỏi video"><i class="tic" style="color:#a78bfa">♪⇣</i> Tách âm</button>

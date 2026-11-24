@@ -92,7 +92,7 @@ const Visual: React.FC<{c: Clip; frames: number; muted: boolean}> = ({c, frames,
 		) : null;
 	return (
 		<AbsoluteFill style={{opacity: fade * (c.opacity ?? 1), overflow: 'hidden'}}>
-			<ColorGrade f={grade}>
+			<ColorGrade f={c.isLogo || (c.type === 'image' && c.name === 'Logo') ? undefined : grade}>
 			{blurBg}
 			<AbsoluteFill
 				style={{

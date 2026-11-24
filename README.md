@@ -24,7 +24,7 @@ App cần key Pixabay để tìm và tải clip:
 
 Có AI, app sẽ chọn cảnh quay theo nội dung lời bài hát, tìm lời chuẩn của bài và dùng được tab **AI chỉnh sửa** trong Editor. Không có AI, app vẫn chạy được, chỉ chọn cảnh theo ô **Chủ đề hình ảnh**.
 
-Chỉ cần **một trong hai**. Cài cả hai thì Claude được dùng trước, Codex làm dự phòng. App dùng gói bạn đã đăng nhập trong CLI, không cần API key và không tính phí API riêng.
+Chỉ cần **một trong hai**. Trong Cài đặt, chọn model Claude hoặc Codex muốn dùng; app sẽ chạy CLI tương ứng với model đã chọn. App dùng gói bạn đã đăng nhập trong CLI, không cần API key riêng.
 
 **Claude CLI** (cần gói Claude Pro/Max):
 
@@ -46,9 +46,9 @@ Tải lên một file nhạc (mp3/wav/m4a/flac). Tool sẽ:
 
 1. Nghe và lấy **lời bài hát** kèm thời điểm từng chữ (Whisper). Nếu bạn dán sẵn lời, tool căn lời đó vào giọng hát nên chính xác hơn.
 2. Phân tích **nhịp (beat)** và chia bài thành các cảnh, điểm cắt cảnh rơi đúng nhịp.
-3. Chọn **từ khóa hình ảnh** cho từng cảnh: Claude CLI (lệnh `claude`, dùng gói Claude đang đăng nhập, không cần API key) đọc lời bài hát. Nếu không có CLI thì dùng chủ đề bạn nhập.
+3. Chọn **từ khóa hình ảnh** cho từng cảnh: Claude CLI hoặc Codex CLI đọc lời bài hát theo model đã chọn. Nếu không kết nối AI thì dùng chủ đề bạn nhập.
 4. Tìm và tải **video miễn phí bản quyền từ Pixabay**.
-5. Dựng video bằng **Remotion**: chuyển cảnh mượt (fade, slide, wipe), hiệu ứng zoom chậm, **phụ đề chạy khớp lời** và **tên bài hát có hiệu ứng**.
+5. Dựng video bằng **Remotion**: các chuyển cảnh mượt gồm Hoà tan + phóng, Hoà tan nhoè, Đẩy mềm và Hoà sáng; hiệu ứng zoom chậm, **phụ đề chạy khớp lời** và **tên bài hát có hiệu ứng**.
 
 ## Cài đặt (một lần)
 
@@ -80,6 +80,14 @@ File nhạc và video có thể chiếm nhiều dung lượng. Tắt app, thêm 
 - **Tên bài hát**: chỉnh chữ, cỡ chữ, màu, màu nhấn, vị trí, thời gian hiện. Hiệu ứng có `zoom`, `fade`, `typewriter`, `bounce`, `slide-up`, `glow`.
 - **Lưu & render lại**: đổi style mà không phải nhận lời hay tải clip lại.
 
+## Editor
+
+Mở dự án bằng **Editor** tại `/editor` để sắp xếp clip trên timeline, thêm chữ và câu lời, chỉnh chuyển cảnh, âm lượng, bộ lọc màu rồi xuất video. Có thể tạo dự án dựng trống và nhập media riêng. Tab **AI** sửa timeline bằng câu lệnh khi đã kết nối Claude CLI hoặc Codex CLI; lệnh “khôi phục lại” và “về như ban đầu” dùng các bản lưu trước lần sửa bằng AI. AI cũng có thể tìm và thêm clip mới khi đã kết nối Pixabay. Có nút tra và sửa lời phụ đề: app tìm lời chuẩn qua LRCLIB, rồi dùng CLI AI đã chọn khi cần. Sau khi xuất xong, Editor dọn file tạm và lịch sử hoàn tác thông thường, nhưng giữ bản khôi phục AI gần nhất.
+
+Các API của Editor gồm `POST /api/projects`, `GET/PUT /api/jobs/{id}/timeline`, `POST /api/jobs/{id}/media`, `POST /api/jobs/{id}/ai-edit`, `POST /api/jobs/{id}/fix-lyrics`, `POST /api/jobs/{id}/export`, `GET /api/jobs/{id}/export-file`, `POST /api/jobs/{id}/open-export` và `POST /api/jobs/{id}/cleanup`. Kết nối CLI AI và Pixabay được quản lý qua `/api/settings` và `/api/settings/{service}/{action}`.
+
+Từ **v1.0.4**, Editor có tab AI để sửa timeline bằng câu lệnh, khôi phục lần sửa trước hoặc về ban đầu, tự dọn file tạm sau khi xuất và hiện đầy đủ tên clip khi di chuột trên timeline. Các bản mới hơn bổ sung sửa lời phụ đề, nhiều kiểu chuyển cảnh và bộ lọc màu.
+
 ## Dùng bằng dòng lệnh
 
 ```powershell
@@ -92,7 +100,10 @@ python make_video.py --render-only output\<job>\props.json
 ```
 make_video.py          pipeline chính (CLI)
 musicvideo/            audio, lời bài hát, beat/cảnh, từ khóa, Pixabay
-server/                web server FastAPI + giao diện (static/index.html)
+server/                web server FastAPI + giao diện chính (static/index.html)
+server/static/editor/  Editor: timeline, xem trước, bộ lọc, AI và xuất video
+musicvideo/lyrics_lookup.py  tìm lời chuẩn qua LRCLIB và CLI AI
+logos/                 thư viện logo kênh (tạo khi cần)
 remotion/src/          dựng video: Scenes (chuyển cảnh), Subtitles (3 kiểu), TitleText (hiệu ứng)
 scripts/               start.ps1 / stop.ps1
 ```

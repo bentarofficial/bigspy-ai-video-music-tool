@@ -160,7 +160,7 @@ function clipHTML(c) {
   const bg = c.type === 'image' && c.src ? `background-image:url('/media/${encodeURI(c.src)}')` : m && m.thumb ? `background-image:url('${m.thumb}')` : '';
   const name = c.type === 'text' ? c.title?.text : c.name;
   const trz = c.transition && c.transition.type !== 'none' ? `<div class="trz" style="width:${Math.min(w / 2, c.transition.dur * pps)}px"></div>` : '';
-  return `<div class="clip ${c.type} ${bg ? 'thumb' : ''} ${sel.has(c.id) ? 'sel' : ''}" data-id="${c.id}" style="left:${left}px;width:${w}px;${bg}">
+  return `<div class="clip ${c.type} ${bg ? 'thumb' : ''} ${sel.has(c.id) ? 'sel' : ''}" data-id="${c.id}" title="${esc(name || LABEL[c.type])}" style="left:${left}px;width:${w}px;${bg}">
     ${trz}<div class="h l" data-h="l"></div><span class="cn">${esc(name || LABEL[c.type])}</span><span class="fx">${fx}</span><div class="h r" data-h="r"></div></div>`;
 }
 
@@ -641,7 +641,7 @@ function rowHTML(f, v) {
   let ctl = '';
   if (f.type === 'range') ctl = `<input type="range" min="${f.min}" max="${f.max}" step="${f.step}" value="${v ?? f.def}" data-k="${f.key}" data-n><input type="number" min="${f.min}" max="${f.max}" step="${f.step}" value="${v ?? f.def}" data-k="${f.key}" data-n>`;
   else if (f.type === 'number') ctl = `<input type="number" step="${f.step || 0.01}" min="${f.min ?? ''}" value="${v ?? f.def ?? 0}" data-k="${f.key}" data-n>`;
-  else if (f.type === 'color') ctl = `<input type="color" value="${v ?? f.def}" data-k="${f.key}"><span style="color:var(--dim);font-size:11px">${v ?? f.def}</span>`;
+  else if (f.type === 'color') { const color = v ?? f.def ?? '#ffffff'; ctl = `<span class="colorf"><input type="color" value="${esc(color)}" data-k="${f.key}"><input type="text" value="${esc(color.toUpperCase())}" data-hex="${f.key}" maxlength="7" spellcheck="false" aria-label="Mã màu ${esc(f.label)}"></span>`; }
   else if (f.type === 'check') ctl = `<input type="checkbox" ${v ?? f.def ? 'checked' : ''} data-k="${f.key}" data-b>`;
   else if (f.type === 'select') ctl = `<select data-k="${f.key}">${f.opts.map(([a, b]) => `<option value="${esc(a)}" ${f.key.endsWith('fontFamily') ? `style="font-family:${esc(a)}"` : ''} ${String(v ?? f.def) === String(a) ? 'selected' : ''}>${esc(b)}</option>`).join('')}</select>`;
   else if (f.type === 'textarea') ctl = `<textarea rows="2" data-k="${f.key}">${esc(v ?? '')}</textarea>`;
@@ -945,7 +945,10 @@ async function sendAI(fixLyrics = false) {
   if (RESTORE_RE.test(text)) { inp.value = ''; aiLog.length = 0; aiLog.push({who: 'me', text}, {who: 'ai', text: '✓ ' + restoreAI(ALL_RE.test(text))}); return drawAILog(); }
   aiLog.push({who: 'me', text: fixLyrics ? '🔎 Tra & sửa lời phụ đề' + (text ? ' theo lời đã dán' : '') : text}); inp.value = '';
   btn.disabled = true; btn.textContent = fixLyrics ? 'Đang tra lời…' : 'AI đang làm…';
-  aiLog.push({who: 'ai wait', text: fixLyrics && !text ? 'Đang research lời bài hát trên mạng (có thể mất vài phút)…' : 'Đang xử lý…'}); drawAILog();
+  const started = Date.now();
+  const stage = fixLyrics && !text ? 'Đang tìm và đối chiếu lời bài hát' : 'Đang chờ AI xử lý lệnh';
+  aiLog.push({who: 'ai wait', text: `${stage} (0 giây)…`}); drawAILog();
+  const elapsed = setInterval(() => { const wait = aiLog.find((m) => m.who === 'ai wait'); if (wait) { wait.text = `${stage} (${Math.floor((Date.now() - started) / 1000)} giây)…`; drawAILog(); } }, 1000);
   try {
     const r = fixLyrics
       ? await apiCall(`/api/jobs/${JOB}/fix-lyrics`, {method: 'POST', headers: {'Content-Type': 'application/json'},
@@ -958,11 +961,11 @@ async function sendAI(fixLyrics = false) {
     // làm xong -> dọn câu lệnh cũ, chỉ giữ kết quả lần gần nhất cho nhẹ
     aiLog.length = 0; aiLog.push({who: 'ai', text: '✓ ' + (r.reply || 'Xong.') + (n ? ` (${n} thay đổi)` : '')});
   } catch (e) { aiLog.pop(); aiLog.push({who: 'ai err', text: '⚠ ' + e.message}); }
-  btn.disabled = false; btn.textContent = label; drawAILog();
+  clearInterval(elapsed); btn.disabled = false; btn.textContent = label; drawAILog();
 }
-/* Xuất xong: bỏ lịch sử hoàn tác + nhật ký AI trong bộ nhớ, xoá file tạm trên máy (giữ video đã xuất). */
+/* Xuất xong: dọn lịch sử thao tác và file tạm, giữ bản khôi phục AI gần nhất. */
 async function cleanupAfterExport() {
-  hist.length = 0; fut.length = 0; lastSnap = snap(); aiLog.length = 0; aiSnaps = []; saveAISnaps(); drawAILog();
+  hist.length = 0; fut.length = 0; lastSnap = snap(); aiLog.length = 0; aiSnaps = aiSnaps.slice(-1); saveAISnaps(); drawAILog();
   $('#undo').disabled = $('#redo').disabled = true;
   try {
     const r = await apiCall(`/api/jobs/${JOB}/cleanup`, {method: 'POST'});
@@ -981,6 +984,13 @@ function applyAIOps(ops) {
       n++;
     }
     else if (o.op === 'delete') { const del = new Set(ids(o).map((c) => c.id)); TL.clips = TL.clips.filter((c) => !del.has(c.id)); n += del.size; }
+    else if (o.op === 'add_media' && o.media && o.clip && o.media.type === 'video' && o.media.src?.startsWith('clips/')) {
+      if (!TL.media.some((m) => m.src === o.media.src)) TL.media.push(o.media);
+      const {trackName, ...c} = o.clip;
+      let t = TL.tracks.find((x) => x.id === c.track);
+      if (!t || t.kind === 'main') { t = newTrack('video', 0); t.name = trackName || 'Video Pixabay'; }
+      TL.clips.push({start: 0, dur: 5, ...c, track: t.id, id: uid()}); n++;
+    }
     else if (o.op === 'add' && o.clip) {
       const {trackName, ...c} = o.clip;
       let t = TL.tracks.find((x) => x.id === c.track) || (trackName && TL.tracks.find((x) => x.name === trackName));
@@ -1170,12 +1180,20 @@ function bindProps() {
       if (k === 'title.text') c.name = v.split('\n')[0];
     }
     // đồng bộ cặp range/number
-    $$(`[data-k="${k}"]`, box).forEach((x) => { if (x !== el && x.type !== 'checkbox') x.value = v; if (x.nextElementSibling?.tagName === 'SPAN' && x.type === 'color') x.nextElementSibling.textContent = v; });
+    $$(`[data-k="${k}"]`, box).forEach((x) => { if (x !== el && x.type !== 'checkbox') x.value = v; });
+    if (el.type === 'color') $$(`[data-hex="${k}"]`, box).forEach((x) => { x.value = v.toUpperCase(); });
     if (final) { pending = false; commit(); }
     else { pending = true; renderTimeline(); pushPlayer(); }
   };
   box.addEventListener('input', (e) => { if (e.target.dataset.k) apply(e.target, false); });
   box.addEventListener('change', (e) => { if (e.target.dataset.lf) lyricsField(e.target); });
+  box.addEventListener('change', (e) => {
+    const hex = e.target.dataset.hex; if (!hex) return;
+    const value = e.target.value.trim();
+    const picker = box.querySelector(`[data-k="${hex}"]`);
+    if (!/^#[0-9a-fA-F]{6}$/.test(value)) { e.target.value = picker?.value.toUpperCase() || ''; return; }
+    if (picker) { picker.value = value; apply(picker, true); box._for = null; renderProps(); }
+  });
   box.addEventListener('change', (e) => { if (e.target.dataset.k) { apply(e.target, true); box._for = null; renderProps(); } });
   box.addEventListener('click', (e) => {
     const ly = e.target.closest('[data-ly]'); if (ly && ly.tagName === 'BUTTON') return lyricsAction(ly.dataset.ly);
@@ -1528,7 +1546,9 @@ function bindPhase2() {
   $('#trDur').oninput = () => ($('#trDurLb').textContent = trDur() + 's');
   const allJ = () => TL.tracks.flatMap(joints);
   $('#trAll').onclick = () => { const c = TL.clips.find((x) => sel.has(x.id) && x.transition); applyTransition(c ? c.transition.type : 'fade', allJ()); };
-  $('#trRand').onclick = () => { const js = allJ(); if (!js.length) return toast('Chưa có chỗ nối nào'); js.forEach((c) => (c.transition = {type: TRANS[2 + Math.floor(Math.random() * (TRANS.length - 2))][0], dur: trDur()})); commit(); toast(`Đã đặt ngẫu nhiên ${js.length} chỗ nối`); };
+  $('#trRand').onclick = () => { const js = allJ(); if (!js.length) return toast('Chưa có chỗ nối nào'); const pool = TRANS.slice(1).map((t) => t[0]); js.forEach((c) => (c.transition = {type: pool[Math.floor(Math.random() * pool.length)], dur: trDur()})); commit(); toast(`Đã đặt ngẫu nhiên ${js.length} chỗ nối`); };
+  $('#trRandSmooth').onclick = () => { const js = allJ(); if (!js.length) return toast('Chưa có chỗ nối nào'); const pool = ['dissolve-zoom', 'blur-dissolve', 'soft-push', 'light-leak', 'fade']; js.forEach((c) => (c.transition = {type: pool[Math.floor(Math.random() * pool.length)], dur: trDur()})); commit(); toast(`Đã đặt ${js.length} chuyển cảnh mượt`); };
+  $('#trUpgrade').onclick = () => { const old = allJ().filter((c) => ['slide-left', 'slide-right', 'slide-up', 'slide-down', 'wipe-left', 'wipe-right', 'wipe-up', 'wipe-down'].includes(c.transition?.type)); if (!old.length) return toast('Không có chuyển cảnh cũ để đổi'); const pool = ['dissolve-zoom', 'blur-dissolve', 'soft-push', 'light-leak']; old.forEach((c, i) => { c.transition = {type: pool[i % pool.length], dur: c.transition.dur}; }); commit(); toast(`Đã đổi ${old.length} chuyển cảnh sang kiểu mượt`); };
   $('#trNone').onclick = () => applyTransition('none', TL.clips.filter((c) => c.transition));
   $('#ripple').onclick = () => { rippleOn = !rippleOn; $('#ripple').classList.toggle('on', rippleOn); try { localStorage.setItem('ed.ripple', rippleOn ? '1' : '0'); } catch {} };
   try { rippleOn = localStorage.getItem('ed.ripple') === '1'; } catch {}

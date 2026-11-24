@@ -592,7 +592,7 @@ def _logo_clip(lg: dict, w: int, h: int, dur: float) -> dict:
     v, hz = (lg.get("position") or "top-right").split("-")
     cx = m + iw / 2 if hz == "left" else w - m - iw / 2
     cy = m + ih / 2 if v == "top" else h - m - ih / 2
-    return {"id": _uid(), "track": "t0", "type": "image", "src": lg["src"], "start": 0, "dur": dur, "name": "Logo",
+    return {"id": _uid(), "track": "t0", "type": "image", "src": lg["src"], "start": 0, "dur": dur, "name": "Logo", "isLogo": True,
             "fit": "contain", "x": round(cx / w * 100, 2), "y": round(cy / h * 100, 2), "scale": round(scale, 4),
             "opacity": lg.get("opacity", 1)}
 
@@ -767,6 +767,8 @@ Các thao tác được phép:
 - {"op":"delete","ids":["<clip id>",...]}
 - {"op":"add","clip":{"track":"<track id>","type":"text","start":0,"dur":3,"name":"...","title":{"text":"...","fontSize":80,"color":"#ffffff"}}}
   // nếu cần track mới (vd chưa có track Tiêu đề) thì đặt "track":"new" và "trackName":"Tiêu đề"
+- {"op":"pixabay","query":"English visual search terms","start":0,"dur":5,"track":"<track id>"}
+  // thêm clip Pixabay khi người dùng yêu cầu cảnh quay mới; dùng từ khoá hình ảnh tiếng Anh, không tự bịa URL.
 - {"op":"timeline","set":{"filter":{"preset":"warm","intensity":1,"brightness":0,"contrast":0,"saturation":0,"temperature":0,"tint":0,"vignette":0,"hue":0,"fade":0},"width":1080,"height":1920,"background":"#000000"}}
   // filter: intensity 0-1; brightness/contrast/saturation/temperature/tint -100..100; vignette/fade 0..100; hue -180..180.
   // Khi đổi filter, giữ nguyên các giá trị cũ không liên quan. "Tăng nhẹ" ~ 15-25.
@@ -834,6 +836,7 @@ def ai_edit(job_id: str, body: dict):
     if not isinstance(res, dict) or not isinstance(res.get("ops"), list):
         raise HTTPException(500, "AI trả về không đúng định dạng: " + out.strip()[:200])
     reply, ops = str(res.get("reply") or ""), []
+    pixabay_count = 0
     for o in res["ops"]:
         if not isinstance(o, dict):
             continue
@@ -843,9 +846,46 @@ def ai_edit(job_id: str, body: dict):
             reply = (reply + " " + r["reply"]).strip()
         elif o.get("op") == "set_text":
             ops += set_text_ops(tl, str(o.get("id") or ""), str(o.get("text") or ""))
-        else:
+        elif o.get("op") == "pixabay":
+            if pixabay_count >= 3:
+                reply = (reply + " Mỗi lệnh chỉ thêm tối đa 3 clip Pixabay.").strip()
+                continue
+            pixabay_count += 1
+            try:
+                ops.append(pixabay_add_op(tl, o))
+            except Exception as e:
+                reply = (reply + f" Không thêm được clip Pixabay: {e}").strip()
+        elif o.get("op") in {"update", "delete", "add", "timeline"}:
             ops.append(o)
     return {"reply": reply, "ops": ops}
+
+
+def pixabay_add_op(tl: dict, request: dict) -> dict:
+    """Tìm, tải và chuẩn hoá một clip để Editor có thể thêm trực tiếp vào timeline."""
+    from musicvideo.pixabay import Pixabay
+    load_env()
+    key = os.environ.get("PIXABAY_API_KEY", "")
+    if not key:
+        raise ValueError("Chưa kết nối Pixabay trong Cài đặt")
+    query = str(request.get("query") or "").strip()[:100]
+    if not query:
+        raise ValueError("Thiếu từ khoá tìm kiếm")
+    start = max(0.0, min(float(request.get("start") or 0), 24 * 3600))
+    dur = max(1.0, min(float(request.get("dur") or 5), 60.0))
+    used = {int(m.group(1)) for c in tl.get("clips", [])
+            if (m := re.search(r"pixabay_(\d+)", str(c.get("src") or "")))}
+    px = Pixabay(key, CACHE_DIR, CLIPS_DIR)
+    hit = px.find(query, dur, tl.get("height", 0) > tl.get("width", 0), used)
+    if not hit:
+        raise ValueError(f"Không tìm thấy clip cho '{query}'")
+    src = px.download(hit).relative_to(PUBLIC_DIR).as_posix()
+    source_dur = float(hit.get("duration") or dur)
+    media = {"id": _uid(), "name": f"Pixabay: {query}", "src": src, "type": "video", "duration": source_dur}
+    track = str(request.get("track") or "new")
+    clip = {"type": "video", "track": track, "trackName": "Video Pixabay", "src": src,
+            "start": round(start, 3), "dur": round(min(dur, source_dur), 3), "srcDur": source_dur,
+            "name": media["name"], "fit": "cover", "volume": 0}
+    return {"op": "add_media", "media": media, "clip": clip}
 
 
 def _lyric_clips(tl: dict) -> list[dict]:

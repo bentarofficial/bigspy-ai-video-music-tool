@@ -1,25 +1,28 @@
 # Roadmap
 
-Các việc còn dở, tổng hợp từ các phiên làm việc trước (21/11/2026).
+Đối chiếu với code ngày 24/11/2026. Mục đã hoàn thành được đánh dấu; các ý tưởng chưa chọn làm vẫn để mở.
 
-## Chưa làm
+## Tính năng và tài liệu
 
-- [ ] **Ngày tạo trong danh sách dự án** (trang chính). Server đã lưu `created` trong meta và trả về qua `/api/jobs`, nhưng giao diện chưa hiển thị.
-- [ ] **Icon emoji trên thanh công cụ timeline** (🗑 Xoá, 🔗 Nhóm, 🧲 Hút dính) có màu sẵn nên lệch với bộ icon màu riêng. Thay bằng ký hiệu thường hoặc SVG cho đồng bộ.
-- [ ] **Nút ◆ chuyển cảnh** đang màu vàng. Quyết định giữ màu hay chuyển sang xám như phần còn lại.
-- [ ] **README chưa nói về Editor**: trình dựng `/editor` (timeline, chuyển cảnh, chữ, bộ lọc, xuất video), các API mới (`/api/projects`, `timeline`, `media`, `export`, `export-file`, `open-export`, `api/settings/...`), tự tìm lời bài hát (LRCLIB → Claude CLI) và mục "Cấu trúc" (`server/static/editor/`, `musicvideo/lyrics_lookup.py`).
-- [ ] **Xoá `server/static/index.backup.html`** nếu không còn dùng.
-- [ ] **Phát hành bản mới (v1.0.4)**: từ v1.0.3 đã có thêm chuyển cảnh mượt, thư viện logo kênh, bỏ Remotion Studio, ô màu gọn trong bảng Tinh chỉnh, sửa nút kiểm tra cập nhật — máy đã cài chưa nhận được.
-- [ ] **README chưa nói về tính năng mới**: Codex CLI dự phòng cho Claude, logo kênh (thư mục `logos/`), 4 chuyển cảnh mượt.
-- [ ] **Ô màu trong Editor** (`/editor`) vẫn là ô màu to kiểu cũ, chưa đổi sang ô nhỏ + mã hex như trang chính.
-- [ ] **Bộ lọc màu trong Editor áp lên cả logo**, làm logo đổi màu. Nên để logo nằm ngoài bộ lọc (như phụ đề / chữ).
-- [ ] **Nút "Ngẫu nhiên" chuyển cảnh trong Editor** bỏ sót kiểu "Hoà tan + phóng" và trộn cả các kiểu gắt (nhiễu, rung…). Nên có tuỳ chọn "ngẫu nhiên kiểu mượt".
-- [ ] **v1.0.4 còn thiếu trong ghi chú phát hành / README**: tab **AI** trong Editor (sửa timeline bằng câu lệnh, lệnh "khôi phục lại" / "về như ban đầu"), tự dọn file tạm + lịch sử hoàn tác sau khi xuất video (API `/api/jobs/{id}/ai-edit`, `/api/jobs/{id}/cleanup`), di chuột lên khối timeline hiện đủ chữ.
-- [ ] **AI chưa sửa được chữ trong câu lời** và chưa thêm được clip mới (từ Pixabay). Cần thêm thao tác cho AI nếu muốn.
-- [ ] **Bản khôi phục của AI bị xoá khi xuất video** (theo cơ chế dọn dẹp). Cân nhắc giữ lại bản gần nhất hoặc báo trước cho người dùng.
-- [ ] **AI mất ~15 giây mỗi lệnh**: có thể hiện tiến trình rõ hơn hoặc cho phép huỷ lệnh đang chạy.
-- [ ] **Ý tưởng đã đề xuất, chưa chọn làm**: sóng âm + điểm nhịp trên track Nhạc, "cắt theo nhịp", thư viện clip Pixabay trong tab Media, ảnh thu nhỏ trên clip video, keyframe, marker, xuất một đoạn in/out, lưu phiên bản dự án.
-- [ ] **Video tạo trước đây** vẫn dùng chuyển cảnh cũ (trượt/quét, 0,5 giây). Có thể thêm nút "Đổi sang chuyển cảnh mượt" cho dự án cũ.
+- [x] **Ngày tạo trong danh sách dự án**: hiển thị theo giờ địa phương khi job có `created`.
+- [x] **Icon timeline**: thay emoji ở Xoá, Nhóm và Hút dính bằng ký hiệu một màu.
+- [x] **Nút ◆ chuyển cảnh**: đã chuyển sang màu trắng đồng bộ.
+- [x] **README về Editor**: bổ sung tính năng, API, tìm lời và cấu trúc thư mục.
+- [x] **Xoá `server/static/index.backup.html`**: không có tham chiếu sử dụng.
+- [x] **v1.0.4**: đã có tag phát hành; phiên bản code hiện tại là v1.0.27.
+- [x] **README về tính năng mới**: model Claude/Codex, thư viện logo và 4 chuyển cảnh mượt.
+- [x] **Ô màu trong Editor**: ô nhỏ cùng mã hex có thể nhập.
+- [x] **Bộ lọc màu trong Editor**: logo được loại khỏi bộ lọc toàn video, kể cả dự án cũ có clip ảnh tên `Logo`.
+- [x] **Ngẫu nhiên chuyển cảnh**: gồm cả Hoà tan + phóng; thêm nút chỉ chọn kiểu mượt.
+- [x] **README về tab AI, dọn dẹp sau xuất** và tooltip đầy đủ trên clip timeline.
+- [x] **AI sửa chữ trong câu lời**: đã có `fix_lyrics` và `set_text`.
+- [x] **AI thêm clip Pixabay mới**: thao tác `pixabay` tìm, tải và thêm clip mới vào timeline khi đã kết nối Pixabay.
+- [x] **Bản khôi phục AI khi xuất video**: giữ bản gần nhất.
+- [x] **Trạng thái AI khi chạy**: hiển thị thời gian chờ và bước đang xử lý.
+- [ ] **Huỷ lệnh AI đang chạy**: cần cơ chế dừng CLI ở server; chưa triển khai.
+- [ ] **Ý tưởng đã đề xuất, chưa chọn làm**: sóng âm + điểm nhịp trên track Nhạc, "cắt theo nhịp", thư viện clip Pixabay trong tab Media, keyframe, marker, xuất một đoạn in/out, lưu phiên bản dự án.
+- [x] **Ảnh thu nhỏ trên clip video**: đã có trong timeline.
+- [x] **Video tạo trước đây**: thêm nút "Đổi chuyển cảnh cũ sang mượt" trong Editor.
 
 ## Cần kiểm tra
 
