@@ -48,4 +48,25 @@ Các việc còn dở, tổng hợp từ các phiên làm việc trước (21/11
   5. Video nguồn là `output/<job>/video.mp4` (bản H.264 xuất từ Editor được chép vào đây).
 - [ ] **Tự xuất lại video trước khi đăng nếu có chỉnh sửa chưa xuất**: hiện sửa trong Editor mà không bấm Xuất video, rồi đăng từ menu ⋯, thì video gửi đi là bản `video.mp4` cũ (không có chỉnh sửa, không cảnh báo). Cách làm: so thời gian sửa `timeline.json` với `video.mp4`; nếu timeline mới hơn thì tự render H.264 rồi mới đăng, đồng thời trang chủ hiện nhắc "Có chỉnh sửa chưa xuất".
 - [ ] **Cảnh quay không lặp giữa các video** (yêu cầu của người dùng): một clip đã dùng thì **khoảng 10 video sau mới được dùng lại**. Hiện video nào cũng trùng 1–2 cảnh với video trước, vì `Pixabay._rank` (`musicvideo/pixabay.py`) luôn chọn clip nhiều lượt tải/thích nhất và tập `used` chỉ tránh trùng trong cùng một video. Hướng làm: lưu lịch sử ID clip của 10 dự án gần nhất (file chung trong `DATA_DIR`), loại các clip đó khi chọn (chỉ dùng lại nếu hết lựa chọn); chọn ngẫu nhiên trong nhóm điểm cao; lấy thêm trang kết quả 2–3; cho AI sinh từ khoá phong phú hơn.
+## Rà soát các phiên làm việc (24/11/2026, bản hiện tại v1.0.37)
+
+Ghi chú: mục "Phát hành bản mới (v1.0.4)" ở trên đã lỗi thời – app đã lên v1.0.37; phần README / ghi chú phát hành vẫn cần cập nhật.
+
+### Chưa làm
+- [ ] **Hàng chờ dự án + ưu tiên xuất video** (đã đề xuất, người dùng chưa chốt làm): hiện bấm Tạo video là chạy ngay, nhiều dự án chạy song song làm máy rất nặng; xuất video từ Editor cũng chạy song song. Hướng làm:
+  1. Mỗi lúc chỉ chạy 1 dự án; dự án sau hiện "Đang chờ (thứ N)", tự chạy khi dự án trước xong, có nút huỷ khi đang chờ.
+  2. Bấm Xuất video trong Editor thì **tạm dừng** (đóng băng, không chạy lại từ đầu) dự án đang tạo, xuất xong tự chạy tiếp; trạng thái "Tạm dừng – đang ưu tiên xuất video".
+  3. Đăng mạng xã hội không cần chờ/tạm dừng.
+  4. Tắt app khi còn hàng chờ thì mở lại tự chạy tiếp (lưu hàng chờ ra file, đúng quy tắc lưu mọi lựa chọn).
+- [ ] **Xuất video bằng ffmpeg trực tiếp** cho timeline đơn giản (cắt, ghép, chữ, nhạc) để nhanh gần CapCut. Remotion hiện chỉ ~5–6 khung/giây ở 1080p (máy không có GPU NVIDIA). Việc lớn, làm khi người dùng yêu cầu.
+
+### Cần kiểm tra
+- [ ] **Nút "⬇ Tải đoạn nhạc"** (`/api/cut-audio`): code xong nhưng chưa kiểm tra trên app thật sau khi khởi động lại server (lúc thử trả 404 vì server cũ).
+- [ ] **Chạy lại từ chỗ lỗi / Tiếp tục** (v1.0.36, `resume_job` trong `server/app.py`): chưa xác nhận người dùng chạy lại thành công dự án "Tình như lá bay xa".
+- [ ] **Render tự thử lại với ít luồng hơn**: mới thử với đúng clip lỗi, chưa thử trên nhiều dự án.
+- [ ] **Phụ đề chill chạy theo ký tự** (Chữ chảy, Hiện trước vài chữ, Sáng dần, Sương mờ – v1.0.17): mới xem trong Editor, chưa xuất video hoàn chỉnh.
+- [ ] **Tuỳ chọn phụ đề ở form tạo video** (v1.0.34): kiểm tra tạo trọn một video với từng kiểu và lựa chọn được nhớ sau khi khởi động lại.
+- [ ] **Tăng tốc xuất video** (720p/480p dựng thẳng, JPEG, 6 luồng, `veryfast`; chờ ảnh 120 giây + tải lại 2 lần – v1.0.18): mới đo đoạn 10 giây, chưa xuất trọn một video qua Editor; chưa xác nhận dự án "1 Từng Yêu" xuất được.
+- [ ] **Hậu tố model Codex** (nhanh / cân bằng / đời cũ): tự đoán từ mô tả tiếng Anh – kiểm tra lại khi Codex có model mới.
+
 - [x] **Nút "Dọn dẹp" clip tải về** (đã làm: Cài đặt → "Clip đã tải"; `GET /api/clips`, `POST /api/clips/cleanup`; `restore_clips` tải lại clip thiếu khi mở Editor, xuất video, render lại) (yêu cầu của người dùng, để tiết kiệm ổ đĩa): hiện clip Pixabay lưu chung ở thư mục `clips` và **không bao giờ bị xoá** (kể cả khi xuất video hay xoá dự án). Đã chốt: **người dùng tự bấm dọn**, app không tự xoá (không xoá lúc dự án xong, lúc xuất, lúc đóng hay mở app). Hướng làm: trong Cài đặt hiện dung lượng thư mục clip (vd "Clip đã tải: 2,3 GB") kèm nút "Dọn dẹp", hỏi xác nhận rồi xoá; không cho bấm khi có dự án đang chạy. Mở lại dự án cũ trong Studio sau khi dọn thì app tự tải lại clip theo ID Pixabay lưu trong timeline. Lịch sử chống trùng ở mục trên chỉ lưu ID nên không bị ảnh hưởng.
