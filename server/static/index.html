@@ -73,7 +73,9 @@ aside{background:rgba(12,12,14,.75);backdrop-filter:blur(20px);border-right:1px 
 .ttbox h3{margin:0 0 4px;font-size:16px}.ttbox textarea{min-height:90px;margin-top:10px;resize:vertical}
 .ttbox .row{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}.ttbox .row button{padding:8px 14px}
 .ttst{margin-top:12px;font-size:13px;padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
-.ttst.ok{color:var(--ok)}.ttst.err{color:var(--err)}
+.ttst.ok{color:var(--ok)}
+.sharelist{display:grid;gap:8px}.shareitem{display:flex;align-items:center;gap:10px;text-align:left;padding:10px 12px;width:100%}
+.shareitem b{display:block;font-size:13.5px}.shareitem small{display:block;color:var(--dim);font-size:11.5px;font-weight:400}.shareitem:disabled{opacity:.45;cursor:default}.ttst.err{color:var(--err)}
 .dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dim)}
 .dot.done{background:var(--ok)}.dot.error{background:var(--err)}.dot.running{background:var(--warn);box-shadow:0 0 0 0 rgba(255,255,255,.6);animation:pulse 1.4s infinite}
 @keyframes pulse{70%{box-shadow:0 0 0 7px rgba(255,255,255,0)}100%{box-shadow:0 0 0 0 rgba(255,255,255,0)}}
@@ -918,6 +920,29 @@ async function tiktokDialog(j) {
   document.body.append(w);
 }
 
+// Bảng chọn nền tảng. Thêm nền tảng mới: thêm 1 dòng vào SHARE_TARGETS.
+const SHARE_TARGETS = [
+  {id: 'tiktok', name: 'TikTok', icon: '🎵', desc: 'Gửi vào hộp nháp, hoàn tất trong app TikTok', open: j => tiktokDialog(j)},
+  {id: 'youtube', name: 'YouTube Shorts', icon: '▶️', desc: 'Sắp có'},
+  {id: 'facebook', name: 'Facebook Reels', icon: '📘', desc: 'Sắp có'},
+];
+function shareDialog(j) {
+  const w = document.createElement('div'); w.className = 'ttmodal';
+  w.innerHTML = `<div class="ttbox"><h3>📤 Đăng lên mạng xã hội</h3><div class="hint" style="margin:0 0 10px">Chọn nền tảng cho <b></b></div><div class="sharelist"></div>
+    <div class="row"><button class="ghost" data-a="close">Đóng</button></div></div>`;
+  w.querySelector('b').textContent = (j.title || j.id).replace(/\.(wav|mp3|m4a|flac|ogg|aac)$/i, '');
+  for (const t of SHARE_TARGETS) {
+    const b = document.createElement('button'); b.className = 'ghost shareitem'; b.disabled = !t.open;
+    b.innerHTML = `<span class="svc-ic">${t.icon}</span><span><b></b><small></small></span>`;
+    b.querySelector('b').textContent = t.name; b.querySelector('small').textContent = t.desc;
+    b.onclick = () => { w.remove(); t.open(j); };
+    w.querySelector('.sharelist').append(b);
+  }
+  w.onclick = e => { if (e.target === w) w.remove(); };
+  w.querySelector('[data-a=close]').onclick = () => w.remove();
+  document.body.append(w);
+}
+
 // ---- jobs ----
 const label = {running: 'đang chạy', done: 'xong', error: 'lỗi', stopped: 'đã dừng'};
 async function loadJobs() {
@@ -944,7 +969,7 @@ function jobMenu(j, btn) {
   closeJobMenu(); if (wasOpen) return;
   btn.classList.add('open');
   const m = document.createElement('div'); m.className = 'jmenu';
-  m.innerHTML = `<button data-a="rename">✏️ Đổi tên</button>${j.hasVideo ? '<button data-a="dl">⬇️ Tải video</button><button data-a="tt">🎬 Gửi lên TikTok</button>' : ''}<button data-a="del" class="danger">🗑 Xoá dự án</button>`;
+  m.innerHTML = `<button data-a="rename">✏️ Đổi tên</button>${j.hasVideo ? '<button data-a="dl">⬇️ Tải video</button><button data-a="tt">📤 Đăng lên mạng xã hội</button>' : ''}<button data-a="del" class="danger">🗑 Xoá dự án</button>`;
   m.onclick = e => e.stopPropagation();
   const r = btn.getBoundingClientRect();
   m.style.top = r.bottom + 4 + 'px'; m.style.left = Math.max(8, r.right - 150) + 'px';
@@ -957,7 +982,7 @@ function jobMenu(j, btn) {
     loadJobs();
   };
   m.querySelector('[data-a=dl]')?.addEventListener('click', () => { closeJobMenu(); location.href = `/api/jobs/${j.id}/video`; });
-  m.querySelector('[data-a=tt]')?.addEventListener('click', () => { closeJobMenu(); tiktokDialog(j); });
+  m.querySelector('[data-a=tt]')?.addEventListener('click', () => { closeJobMenu(); shareDialog(j); });
   m.querySelector('[data-a=del]').onclick = async () => {
     closeJobMenu();
     if (!confirm(`Xoá dự án "${j.title || j.id}"?\nVideo, phụ đề và file nhạc đã tải lên sẽ bị xoá vĩnh viễn.`)) return;
@@ -1021,7 +1046,13 @@ async function refresh() {
   if (j.status === 'running') timer = setTimeout(refresh, 2000); else loadJobs();
 }
 
-loadKeys(); loadTikTok(); loadJobs();
+loadKeys(); loadTikTok(); loadJobs().then(async () => {
+  // từ Editor bấm "Đăng lên mạng xã hội" -> mở bảng chọn nền tảng cho dự án đó
+  const id = new URLSearchParams(location.search).get('share'); if (!id) return;
+  history.replaceState(null, '', '/');
+  const j = (await api('/api/jobs')).find(x => x.id === id);
+  if (j) shareDialog(j);
+});
 
 // ---- không gian làm việc: kéo đổi độ rộng + bật/tắt bảng (nhớ trong trình duyệt) ----
 const app = $('.app'), store = (k, v) => { try { v === undefined ? (v = localStorage.getItem(k)) : localStorage.setItem(k, v); } catch { v = null; } return v; };

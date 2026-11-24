@@ -1217,7 +1217,8 @@ async function exportVideo(opts) {
       $('#modal').hidden = false; $('#xbar').style.width = '100%';
       $('#xmsg').innerHTML = '✅ Xong! Video đã lưu vào dự án.';
       $('#xmsg').innerHTML = `✅ Xong! Đã lưu <b>${esc(j.lastExport || '')}</b> vào thư mục exports.`;
-      $('#xbtns').innerHTML = `<a class="primary" style="text-decoration:none" href="/api/jobs/${JOB}/export-file?t=${Date.now()}" download>⬇ Tải xuống</a><button class="ghost" id="xopen">📂 Mở thư mục</button><button class="ghost" id="xclose2">Đóng</button>`;
+      $('#xbtns').innerHTML = `<a class="primary" style="text-decoration:none" href="/api/jobs/${JOB}/export-file?t=${Date.now()}" download>⬇ Tải xuống</a><button class="ghost" id="xopen">📂 Mở thư mục</button>${/\.mp4$/i.test(j.lastExport) ? '<button class="ghost" id="xtt">📤 Đăng lên mạng xã hội</button>' : ''}<button class="ghost" id="xclose2">Đóng</button>`;
+      $('#xtt')?.addEventListener('click', () => { location.href = `/?share=${encodeURIComponent(JOB)}`; });
       $('#xopen').onclick = () => apiCall(`/api/jobs/${JOB}/open-export`, {method: 'POST'}).catch((e) => toast(e.message));
       $('#xclose2').onclick = closeModal;
       cleanupAfterExport();
