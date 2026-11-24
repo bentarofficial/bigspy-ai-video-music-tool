@@ -28,16 +28,33 @@ class Pixabay:
         f = self.cache_dir / (hashlib.md5(query.lower().encode()).hexdigest() + ".json")
         if f.exists() and time.time() - f.stat().st_mtime < CACHE_TTL:
             return json.loads(f.read_text(encoding="utf-8"))
-        for attempt in range(3):
-            r = requests.get(API, params={"key": self.key, "q": query, "per_page": per_page,
-                                          "safesearch": "true", "video_type": "film"}, timeout=30)
+        last_err = None
+        for attempt in range(6):
+            try:
+                r = requests.get(API, params={"key": self.key, "q": query, "per_page": per_page,
+                                              "safesearch": "true", "video_type": "film"}, timeout=30)
+            except requests.exceptions.RequestException as e:
+                # mạng chập chờn / SSL EOF / bị ngắt kết nối -> chờ rồi thử lại
+                last_err = e
+                print(f"  ⚠ Pixabay lỗi mạng ({type(e).__name__}), thử lại lần {attempt + 1}…", flush=True)
+                time.sleep(min(2 * (attempt + 1), 10))
+                continue
             if r.status_code == 429:  # vượt giới hạn 100 request/phút
                 time.sleep(20 * (attempt + 1))
+                continue
+            if r.status_code >= 500:
+                time.sleep(3 * (attempt + 1))
                 continue
             r.raise_for_status()
             hits = r.json().get("hits", [])
             f.write_text(json.dumps(hits), encoding="utf-8")
             return hits
+        if f.exists():  # dùng tạm cache cũ (quá 24h) còn hơn dừng cả video
+            return json.loads(f.read_text(encoding="utf-8"))
+        if last_err:
+            raise RuntimeError(
+                "Không kết nối được tới pixabay.com (lỗi SSL/mạng). Kiểm tra Internet, tắt VPN/proxy "
+                "hoặc phần mềm diệt virus quét HTTPS, rồi chạy lại.") from last_err
         return []
 
     def find(self, query: str, min_duration: float, portrait: bool, used: set[int]) -> dict | None:
@@ -75,11 +92,19 @@ class Pixabay:
             # 'large' thường là 4K -> nặng; 'medium' (~1080p/720p) đủ đẹp cho video mạng xã hội
             v = next(vids[k] for k in ("medium", "large", "small", "tiny") if vids.get(k, {}).get("url"))
             tmp = raw.with_suffix(".part")
-            with requests.get(v["url"], stream=True, timeout=120) as r:
-                r.raise_for_status()
-                with open(tmp, "wb") as fh:
-                    for chunk in r.iter_content(1 << 20):
-                        fh.write(chunk)
+            for attempt in range(5):
+                try:
+                    with requests.get(v["url"], stream=True, timeout=120) as r:
+                        r.raise_for_status()
+                        with open(tmp, "wb") as fh:
+                            for chunk in r.iter_content(1 << 20):
+                                fh.write(chunk)
+                    break
+                except requests.exceptions.RequestException as e:
+                    if attempt == 4:
+                        raise
+                    print(f"  ⚠ tải clip lỗi ({type(e).__name__}), thử lại…", flush=True)
+                    time.sleep(2 * (attempt + 1))
             tmp.replace(raw)
         normalize(raw, out)
         raw.unlink(missing_ok=True)  # chỉ giữ bản chuẩn hóa cho nhẹ ổ đĩa
