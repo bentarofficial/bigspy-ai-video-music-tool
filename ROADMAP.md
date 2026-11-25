@@ -19,6 +19,9 @@
 - [x] **AI thêm clip Pixabay mới**: thao tác `pixabay` tìm, tải và thêm clip mới vào timeline khi đã kết nối Pixabay.
 - [x] **Bản khôi phục AI khi xuất video**: giữ bản gần nhất.
 - [x] **Trạng thái AI khi chạy**: hiển thị thời gian chờ và bước đang xử lý.
+- [x] **Hội thoại AI giữ lại**: trước đây mỗi lệnh xong và mỗi lần xuất video đều xoá hội thoại; nay lưu theo dự án (`ai_chat.json`), dùng chung giữa trang chủ và Editor, có nút Xoá hội thoại.
+- [x] **Trang chủ: bỏ bảng Tinh chỉnh**, thay bằng Sửa bằng AI + nút Xuất video (`/api/jobs/{id}/ai-apply`, `ai-undo`, `export-saved`). Tab AI là tab đầu tiên trong Editor.
+- [ ] **Xuất video từ trang chủ**: chưa chạy thử trọn một lần render.
 - [ ] **Huỷ lệnh AI đang chạy**: cần cơ chế dừng CLI ở server; chưa triển khai.
 - [ ] **Ý tưởng đã đề xuất, chưa chọn làm**: sóng âm + điểm nhịp trên track Nhạc, "cắt theo nhịp", thư viện clip Pixabay trong tab Media, keyframe, marker, xuất một đoạn in/out, lưu phiên bản dự án.
 - [x] **Ảnh thu nhỏ trên clip video**: đã có trong timeline.

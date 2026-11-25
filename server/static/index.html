@@ -186,6 +186,16 @@ video{width:100%;max-height:62vh;background:#000;display:block}
 .tabs{display:inline-flex;gap:4px;padding:4px;background:var(--field);border:1px solid var(--line);border-radius:12px;margin-bottom:6px}
 .tab{background:transparent;box-shadow:none;color:var(--mute);padding:7px 14px;border-radius:9px}
 .tab.on{background:rgba(255,255,255,.08);color:var(--text)}
+#aiCard .aiex{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
+#aiCard .aiex button{font-size:12px;padding:5px 10px}
+#aiCard textarea{width:100%;box-sizing:border-box}
+#aiCard .ailog{display:flex;flex-direction:column;gap:6px;max-height:46vh;overflow:auto;margin:6px 0 10px}
+#aiCard .ailog:empty{display:none}
+#aiCard .aimsg{padding:8px 11px;border-radius:12px;font-size:13px;line-height:1.45;white-space:pre-wrap;max-width:88%}
+#aiCard .aimsg.me{align-self:flex-end;background:rgba(96,165,250,.18)}
+#aiCard .aimsg.ai{align-self:flex-start;background:rgba(255,255,255,.06)}
+#aiCard .aimsg.wait,#aiCard .aimsg.tip{opacity:.6} #aiCard .aimsg.err{color:var(--err)}
+#aiCard .aihint{margin:8px 0 0;font-size:12px;color:var(--mute)}
 .edhead{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:4px}
 .edhead h2{margin:0}
 .grid3 label:has(input[type=checkbox]){display:flex;align-items:center;gap:8px;color:var(--text);margin-top:36px;cursor:pointer}
@@ -430,35 +440,18 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
       <button id="resumeJob" type="button" title="Chạy tiếp từ bước đang dở, không làm lại các bước đã xong" hidden>▶ Tiếp tục</button>
     </div>
   </div>
-  <div class="card" id="editor" hidden>
-    <div class="edhead"><h2>Tinh chỉnh</h2><div class="tabs"><button type="button" class="tab on" data-tab="sub">Phụ đề</button><button type="button" class="tab" data-tab="title">Tên bài</button></div></div>
-    <div class="pane grid3" data-pane="sub">
-      <div><label>Kiểu phụ đề</label><select data-k="subtitle.mode"><option value="karaoke">Karaoke</option><option value="preview">Hiện trước N chữ</option><option value="full">Cả câu + câu sau</option></select></div>
-      <div><label>Số chữ hiện trước</label><input type="number" min="0" max="6" data-k="subtitle.lookahead"></div>
-      <div><label>Hiện câu sớm (giây)</label><input type="number" step="0.1" min="0" max="3" data-k="subtitle.leadIn"></div>
-      <div><label>Cỡ chữ</label><input type="number" data-k="subtitle.fontSize"></div>
-      <div><label>Màu chữ</label><div class="colorf"><input type="color" data-k="subtitle.color"><input type="text" maxlength="7" spellcheck="false"></div></div>
-      <div><label>Màu khi hát</label><div class="colorf"><input type="color" data-k="subtitle.highlightColor"><input type="text" maxlength="7" spellcheck="false"></div></div>
-      <div><label>Màu viền</label><div class="colorf"><input type="color" data-k="subtitle.strokeColor"><input type="text" maxlength="7" spellcheck="false"></div></div>
-      <div><label>Độ dày viền</label><input type="number" min="0" max="16" data-k="subtitle.strokeWidth"></div>
-      <div><label>Vị trí</label><select data-k="subtitle.position"><option value="bottom">Dưới</option><option value="center">Giữa</option><option value="top">Trên</option></select></div>
-      <div><label>Font</label><select data-k="subtitle.fontFamily"><option value="Arial Black, Arial, sans-serif">Arial Black</option><option value="Arial, sans-serif">Arial</option><option value="Impact, sans-serif">Impact</option><option value="Georgia, serif">Georgia</option><option value="Times New Roman, serif">Times New Roman</option><option value="Segoe UI, sans-serif">Segoe UI</option><option value="Tahoma, sans-serif">Tahoma</option><option value="Verdana, sans-serif">Verdana</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option><option value="Palatino Linotype, serif">Palatino Linotype</option><option value="Courier New, monospace">Courier New</option><option value="Comic Sans MS, cursive">Comic Sans MS</option><option value="Be Vietnam Pro, sans-serif">Be Vietnam Pro</option><option value="Montserrat, sans-serif">Montserrat</option><option value="Roboto, sans-serif">Roboto</option><option value="Open Sans, sans-serif">Open Sans</option><option value="Nunito, sans-serif">Nunito</option><option value="Lexend, sans-serif">Lexend</option><option value="Josefin Sans, sans-serif">Josefin Sans</option><option value="Quicksand, sans-serif">Quicksand</option><option value="Comfortaa, cursive">Comfortaa</option><option value="Oswald, sans-serif">Oswald</option><option value="Anton, sans-serif">Anton</option><option value="Baloo 2, cursive">Baloo 2</option><option value="Playfair Display, serif">Playfair Display</option><option value="Merriweather, serif">Merriweather</option><option value="Noto Serif, serif">Noto Serif</option><option value="Lobster, cursive">Lobster</option><option value="Pacifico, cursive">Pacifico</option><option value="Dancing Script, cursive">Dancing Script</option><option value="Great Vibes, cursive">Great Vibes</option><option value="Charm, cursive">Charm</option><option value="Pattaya, sans-serif">Pattaya</option><option value="Patrick Hand, cursive">Patrick Hand</option><option value="Sigmar, cursive">Sigmar</option></select></div>
-      <div><label>Làm tối nền (0–0.9)</label><input type="number" step="0.05" min="0" max="0.9" data-k="darken"></div>
-      <div><label><input type="checkbox" data-k="subtitle.uppercase">VIẾT HOA</label></div>
+  <div class="card" id="aiCard" hidden>
+    <div class="edhead"><h2>Sửa bằng AI</h2><button class="ghost" id="aiClear" type="button" hidden>🗑 Xoá hội thoại</button></div>
+    <div class="ailog" id="aiLog"></div>
+    <div class="aiex"></div>
+    <textarea id="aiIn" rows="3" placeholder="Mô tả thay đổi bạn muốn… (Ctrl+Enter để gửi)"></textarea>
+    <div class="actions">
+      <button class="ghost" id="aiSend" type="button">✦ Gửi cho AI</button>
+      <button class="ghost" id="aiLyrics" type="button" title="Tra lời bài hát trên mạng, đối chiếu và sửa chữ phụ đề sai (giữ thời gian karaoke). Nếu ô bên trên có lời bài hát thì dùng lời đó.">🔎 Tra &amp; sửa lời phụ đề</button>
+      <button class="ghost" id="aiUndo" type="button" hidden>↺ Khôi phục lần trước</button>
+      <button id="exportVid" type="button">⬆ Xuất video</button>
     </div>
-    <div class="pane grid3" data-pane="title" hidden>
-      <div><label>Tên bài</label><input data-k="title.text"></div>
-      <div><label>Dòng phụ</label><input data-k="title.subtext"></div>
-      <div><label><input type="checkbox" data-k="title.enabled">Hiện tên bài</label></div>
-      <div><label>Hiệu ứng</label><select data-k="title.animation"><option value="zoom">Zoom</option><option value="fade">Fade</option><option value="typewriter">Typewriter</option><option value="bounce">Bounce</option><option value="slide-up">Slide up</option><option value="glow">Glow</option></select></div>
-      <div><label>Cỡ chữ</label><input type="number" data-k="title.fontSize"></div>
-      <div><label>Vị trí dọc (%)</label><input type="number" min="0" max="100" data-k="title.y"></div>
-      <div><label>Màu chữ</label><div class="colorf"><input type="color" data-k="title.color"><input type="text" maxlength="7" spellcheck="false"></div></div>
-      <div><label>Màu nhấn / glow</label><div class="colorf"><input type="color" data-k="title.accentColor"><input type="text" maxlength="7" spellcheck="false"></div></div>
-      <div><label>Hiện trong (giây)</label><input type="number" step="0.5" min="0.5" data-k="title.duration"></div>
-      <div><label>Font</label><select data-k="title.fontFamily"><option value="Arial Black, Arial, sans-serif">Arial Black</option><option value="Arial, sans-serif">Arial</option><option value="Impact, sans-serif">Impact</option><option value="Georgia, serif">Georgia</option><option value="Times New Roman, serif">Times New Roman</option><option value="Segoe UI, sans-serif">Segoe UI</option><option value="Tahoma, sans-serif">Tahoma</option><option value="Verdana, sans-serif">Verdana</option><option value="Trebuchet MS, sans-serif">Trebuchet MS</option><option value="Palatino Linotype, serif">Palatino Linotype</option><option value="Courier New, monospace">Courier New</option><option value="Comic Sans MS, cursive">Comic Sans MS</option><option value="Be Vietnam Pro, sans-serif">Be Vietnam Pro</option><option value="Montserrat, sans-serif">Montserrat</option><option value="Roboto, sans-serif">Roboto</option><option value="Open Sans, sans-serif">Open Sans</option><option value="Nunito, sans-serif">Nunito</option><option value="Lexend, sans-serif">Lexend</option><option value="Josefin Sans, sans-serif">Josefin Sans</option><option value="Quicksand, sans-serif">Quicksand</option><option value="Comfortaa, cursive">Comfortaa</option><option value="Oswald, sans-serif">Oswald</option><option value="Anton, sans-serif">Anton</option><option value="Baloo 2, cursive">Baloo 2</option><option value="Playfair Display, serif">Playfair Display</option><option value="Merriweather, serif">Merriweather</option><option value="Noto Serif, serif">Noto Serif</option><option value="Lobster, cursive">Lobster</option><option value="Pacifico, cursive">Pacifico</option><option value="Dancing Script, cursive">Dancing Script</option><option value="Great Vibes, cursive">Great Vibes</option><option value="Charm, cursive">Charm</option><option value="Pattaya, sans-serif">Pattaya</option><option value="Patrick Hand, cursive">Patrick Hand</option><option value="Sigmar, cursive">Sigmar</option></select></div>
-    </div>
-    <div class="actions"><button id="saveRender">💾 Lưu &amp; render lại</button></div>
+    <p class="aihint">AI sửa bản dựng của dự án. Xem trước và chỉnh chi tiết trong Editor; bấm Xuất video để áp vào video.</p>
   </div>
   <div class="card"><h2>Tiến trình</h2><pre id="log"></pre></div>
 </template>
@@ -1078,21 +1071,49 @@ function jobMenu(j, btn) {
 }
 
 const get = (o, k) => k.split('.').reduce((a, p) => a?.[p], o);
-function fillEditor() {
-  for (const el of document.querySelectorAll('[data-k]')) {
-    const v = get(props, el.dataset.k);
-    if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? '';
+/* ---- sửa bằng AI + xuất video ngay trên trang chủ ---- */
+const AI_EXAMPLES = ['Đổi màu phụ đề sang vàng, viền đen dày hơn', 'Thêm chuyển cảnh mờ chéo 0.6s cho mọi clip', 'Áp bộ lọc ấm, tăng tương phản nhẹ', 'Làm tối các video 30%', 'Thêm tiêu đề 3 giây đầu', 'Phụ đề sai lời, tra lời bài hát và sửa lại cho đúng'];
+function bindAI(id) {
+  const box = $('#aiCard .aiex');
+  for (const x of AI_EXAMPLES) { const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = x; b.onclick = () => { $('#aiIn').value = x; $('#aiIn').focus(); }; box.append(b); }
+  let chat = [];
+  const draw = () => {
+    const el = $('#aiLog'); if (!el) return;
+    el.replaceChildren(...chat.map(m => { const d = document.createElement('div'); d.className = 'aimsg ' + m.who; d.textContent = m.text; return d; }));
+    el.scrollTop = el.scrollHeight;
+    $('#aiClear').hidden = !chat.some(m => !m.who.includes('wait'));
+  };
+  const msg = (t, cls) => { chat.push({who: 'ai ' + cls, text: t}); draw(); };
+  api(`/api/jobs/${id}/ai-chat`).then(c => { if (current === id) { chat = c; draw(); } }).catch(() => {});
+  $('#aiClear').onclick = async () => { if (!confirm('Xoá toàn bộ hội thoại AI của dự án này?')) return; await api(`/api/jobs/${id}/ai-chat`, {method: 'DELETE'}).catch(() => {}); chat = []; draw(); };
+  const busy = (on) => ['#aiSend', '#aiLyrics', '#aiUndo', '#exportVid'].forEach(s => $(s).disabled = on);
+  async function send(fixLyrics) {
+    const text = $('#aiIn').value.trim();
+    if (!text && !fixLyrics) return $('#aiIn').focus();
+    busy(true); $('#aiIn').value = '';
+    chat.push({who: 'me', text: fixLyrics ? '🔎 Tra & sửa lời phụ đề' + (text ? ' theo lời đã dán' : '') : text});
+    const t0 = Date.now(), stage = fixLyrics && !text ? 'Đang tìm và đối chiếu lời bài hát' : 'Đang chờ AI xử lý lệnh';
+    const wait = {who: 'ai wait', text: `${stage} (0 giây)…`}; chat.push(wait); draw();
+    const tick = setInterval(() => { wait.text = `${stage} (${Math.floor((Date.now() - t0) / 1000)} giây)…`; draw(); }, 1000);
+    try {
+      const r = await api(`/api/jobs/${id}/ai-apply`, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify({prompt: text, fixLyrics})});
+      chat = r.chat; if (r.changes) chat = [...chat, {who: 'ai tip', text: 'Bấm ⬆ Xuất video để áp thay đổi vào video.'}];
+      $('#aiUndo').hidden = !r.canUndo; loadJobs();
+    } catch (e) { chat = chat.filter(m => m !== wait); chat.push({who: 'ai err', text: '⚠ ' + e.message}); }
+    clearInterval(tick); draw(); busy(false);
   }
-  syncHex();
-}
-function readEditor() {
-  const patch = {};
-  for (const el of document.querySelectorAll('[data-k]')) {
-    let v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? Number(el.value) : el.value;
-    const [a, b] = el.dataset.k.split('.');
-    if (b) (patch[a] ??= {})[b] = v; else patch[a] = v;
-  }
-  return patch;
+  $('#aiSend').onclick = () => send(false);
+  $('#aiLyrics').onclick = () => send(true);
+  $('#aiIn').onkeydown = (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) send(false); };
+  $('#aiUndo').onclick = async () => {
+    try { const r = await api(`/api/jobs/${id}/ai-undo`, {method: 'POST'}); chat = r.chat; draw(); $('#aiUndo').hidden = true; loadJobs(); }
+    catch (e) { msg('⚠ ' + e.message, 'err'); }
+  };
+  $('#exportVid').onclick = async () => {
+    busy(true);
+    try { await api(`/api/jobs/${id}/export-saved`, {method: 'POST'}); lastVideoState = null; refresh(); }
+    catch (e) { msg('⚠ ' + e.message, 'err'); busy(false); }
+  };
 }
 
 async function select(id) {
@@ -1102,7 +1123,7 @@ async function select(id) {
   $('#openEditor').onclick = () => { location.href = `/editor?id=${id}`; };
   $('#stopJob').onclick = async () => { if (!confirm('Dừng dự án đang chạy?')) return; $('#stopJob').disabled = true; try { await api(`/api/jobs/${id}/stop`, {method: 'POST'}); } catch (e) { alert(e.message); } $('#stopJob').disabled = false; refresh(); };
   $('#resumeJob').onclick = async () => { $('#resumeJob').disabled = true; try { await api(`/api/jobs/${id}/resume`, {method: 'POST'}); } catch (e) { alert(e.message); } $('#resumeJob').disabled = false; lastVideoState = null; refresh(); };
-  $('#saveRender').onclick = async () => { try { await api(`/api/jobs/${id}/props`, {method: 'PUT', headers: {'content-type': 'application/json'}, body: JSON.stringify(readEditor())}); await api(`/api/jobs/${id}/render`, {method: 'POST'}); refresh(); } catch (e) { alert(e.message); } };
+  bindAI(id);
   loadJobs(); refresh();
 }
 
@@ -1123,11 +1144,15 @@ async function refresh() {
     $('#vid').innerHTML = j.hasVideo && j.status !== 'running' ? `<video controls src="/api/jobs/${id}/video?t=${Date.now()}"></video>` : `<div class="vempty">${j.status === 'running' ? '<div class="spin"></div>Đang xử lý… nhận lời, tải clip và render có thể mất vài phút' : '🎬 Chưa có video'}</div>`;
     $('#dl').href = `/api/jobs/${id}/video`; $('#dl').hidden = !j.hasVideo;
   }
-  $('#saveRender').disabled = j.status === 'running';
+  const running = j.status === 'running';
+  $('#aiCard').hidden = !(j.hasProps || j.hasTimeline) || (running && !j.lastExport);
+  if (!$('#aiLog .aimsg.wait:last-child')) ['#aiSend', '#aiLyrics', '#aiUndo', '#exportVid'].forEach(s => $(s).disabled = running);
+  $('#exportVid').textContent = running ? 'Đang xuất…' : '⬆ Xuất video';
+  $('#exportVid').classList.toggle('ghost', !j.hasUnexportedEdits);
+  $('#aiUndo').hidden = !j.aiUndo;
   $('#stopJob').hidden = j.status !== 'running';
   $('#resumeJob').hidden = !['error', 'stopped'].includes(j.status);
   $('#resumeJob').textContent = j.status === 'error' ? '↻ Chạy lại từ chỗ lỗi' : '▶ Tiếp tục';
-  if (j.hasProps && !props) { props = await api(`/api/jobs/${id}/props`); fillEditor(); $('#editor').hidden = false; }
   if (j.status === 'running') timer = setTimeout(refresh, 2000); else loadJobs();
 }
 

@@ -901,8 +901,10 @@ function addCover() {
   toast('Kéo khung trên màn hình xem trước để di chuyển, chấm góc để đổi kích thước');
 }
 
-/* ---- sửa bằng AI ---- */
+/* ---- sửa bằng AI: hội thoại lưu theo dự án (dùng chung với trang chủ) ---- */
 const aiLog = [];
+const aiSave = (...messages) => apiCall(`/api/jobs/${JOB}/ai-chat`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({messages})}).catch(() => {});
+apiCall(`/api/jobs/${JOB}/ai-chat`).then((c) => { if (Array.isArray(c) && c.length) { aiLog.unshift(...c); drawAILog(); } }).catch(() => {});
 const AI_EXAMPLES = ['Đổi màu phụ đề sang vàng, viền đen dày hơn', 'Thêm chuyển cảnh mờ chéo 0.6s cho mọi clip', 'Áp bộ lọc ấm, tăng tương phản nhẹ', 'Làm tối các video 30%', 'Thêm tiêu đề 3 giây đầu', 'Phụ đề sai lời, tra lời bài hát và sửa lại cho đúng'];
 function renderAI(box) {
   box.innerHTML = `<h3>Sửa bằng AI</h3>
@@ -933,17 +935,20 @@ function restoreAI(all) {
 function drawAILog() {
   const el = $('#aiLog'); if (!el) return;
   el.innerHTML = aiLog.map((m) => `<div class="aimsg ${m.who}">${esc(m.text)}</div>`).join('') || '<p class="hint">Chọn một ví dụ bên dưới hoặc tự nhập câu lệnh.</p>';
-  if (aiSnaps.length) el.insertAdjacentHTML('beforeend', `<div class="btnrow"><button class="ghost" id="aiUndo">↺ Khôi phục lần trước</button>${aiSnaps.length > 1 ? `<button class="ghost" id="aiUndoAll">↺ Về như ban đầu (${aiSnaps.length})</button>` : ''}</div>`);
-  const one = (all) => { aiLog.length = 0; aiLog.push({who: 'ai', text: '✓ ' + restoreAI(all)}); drawAILog(); };
+  const done = aiLog.some((m) => m.who !== 'ai wait');
+  if (aiSnaps.length || done) el.insertAdjacentHTML('beforeend', `<div class="btnrow">${aiSnaps.length ? `<button class="ghost" id="aiUndo">↺ Khôi phục lần trước</button>` : ''}${aiSnaps.length > 1 ? `<button class="ghost" id="aiUndoAll">↺ Về như ban đầu (${aiSnaps.length})</button>` : ''}${done ? '<button class="ghost" id="aiClear" title="Xoá toàn bộ hội thoại AI của dự án này">🗑 Xoá hội thoại</button>' : ''}</div>`);
+  const one = (all) => { const m = {who: 'ai', text: '↺ ' + restoreAI(all)}; aiLog.push(m); aiSave(m); drawAILog(); };
   if ($('#aiUndo')) $('#aiUndo').onclick = () => one(false);
   if ($('#aiUndoAll')) $('#aiUndoAll').onclick = () => one(true);
+  if ($('#aiClear')) $('#aiClear').onclick = () => { if (!confirm('Xoá toàn bộ hội thoại AI của dự án này?')) return; aiLog.length = 0; apiCall(`/api/jobs/${JOB}/ai-chat`, {method: 'DELETE'}).catch(() => {}); drawAILog(); };
   el.scrollTop = el.scrollHeight;
 }
 async function sendAI(fixLyrics = false) {
   const inp = $('#aiIn'), btn = $(fixLyrics ? '#aiLyrics' : '#aiSend'), label = btn.textContent, text = inp.value.trim();
   if ((!text && !fixLyrics) || btn.disabled) return;
-  if (RESTORE_RE.test(text)) { inp.value = ''; aiLog.length = 0; aiLog.push({who: 'me', text}, {who: 'ai', text: '✓ ' + restoreAI(ALL_RE.test(text))}); return drawAILog(); }
-  aiLog.push({who: 'me', text: fixLyrics ? '🔎 Tra & sửa lời phụ đề' + (text ? ' theo lời đã dán' : '') : text}); inp.value = '';
+  if (RESTORE_RE.test(text)) { inp.value = ''; const ms = [{who: 'me', text}, {who: 'ai', text: '↺ ' + restoreAI(ALL_RE.test(text))}]; aiLog.push(...ms); aiSave(...ms); return drawAILog(); }
+  const me = {who: 'me', text: fixLyrics ? '🔎 Tra & sửa lời phụ đề' + (text ? ' theo lời đã dán' : '') : text};
+  aiLog.push(me); inp.value = '';
   btn.disabled = true; btn.textContent = fixLyrics ? 'Đang tra lời…' : 'AI đang làm…';
   const started = Date.now();
   const stage = fixLyrics && !text ? 'Đang tìm và đối chiếu lời bài hát' : 'Đang chờ AI xử lý lệnh';
@@ -958,14 +963,14 @@ async function sendAI(fixLyrics = false) {
             presets: Object.keys(window.TLPlayer?.FILTER_PRESETS || {}), transitions: TRANS.map((t) => t[0])})});
     const before = snap(), n = applyAIOps(r.ops || []);
     if (n) { aiSnaps.push(before); if (aiSnaps.length > 10) aiSnaps.shift(); saveAISnaps(); }
-    // làm xong -> dọn câu lệnh cũ, chỉ giữ kết quả lần gần nhất cho nhẹ
-    aiLog.length = 0; aiLog.push({who: 'ai', text: '✓ ' + (r.reply || 'Xong.') + (n ? ` (${n} thay đổi)` : '')});
-  } catch (e) { aiLog.pop(); aiLog.push({who: 'ai err', text: '⚠ ' + e.message}); }
+    const out = {who: 'ai', text: '✓ ' + (r.reply || 'Xong.') + (n ? ` (${n} thay đổi)` : '')};
+    aiLog.pop(); aiLog.push(out); aiSave(me, out);
+  } catch (e) { const out = {who: 'ai err', text: '⚠ ' + e.message}; aiLog.pop(); aiLog.push(out); aiSave(me, out); }
   clearInterval(elapsed); btn.disabled = false; btn.textContent = label; drawAILog();
 }
-/* Xuất xong: dọn lịch sử thao tác và file tạm, giữ bản khôi phục AI gần nhất. */
+/* Xuất xong: dọn lịch sử thao tác và file tạm, giữ bản khôi phục AI gần nhất. Hội thoại AI được giữ nguyên. */
 async function cleanupAfterExport() {
-  hist.length = 0; fut.length = 0; lastSnap = snap(); aiLog.length = 0; aiSnaps = aiSnaps.slice(-1); saveAISnaps(); drawAILog();
+  hist.length = 0; fut.length = 0; lastSnap = snap(); aiSnaps = aiSnaps.slice(-1); saveAISnaps(); drawAILog();
   $('#undo').disabled = $('#redo').disabled = true;
   try {
     const r = await apiCall(`/api/jobs/${JOB}/cleanup`, {method: 'POST'});
@@ -1012,7 +1017,7 @@ function applyAIOps(ops) {
 }
 
 /* ---- tab bên phải ---- */
-let rtab = 'props';
+let rtab = 'ai';
 function showRTab(n) {
   rtab = n;
   $$('.rtabs button').forEach((b) => b.classList.toggle('on', b.dataset.rtab === n));
@@ -1319,7 +1324,7 @@ async function init() {
   $('#ptitle').value = META.title || JOB; document.title = (META.title || JOB) + ' – Editor';
   lastSnap = snap();
   bindTimeline(); bindLibrary(); bindProps(); bindKeys(); bindPhase2(); bindSide();
-  renderMedia(); renderTimeline(); renderProps();
+  renderMedia(); renderTimeline(); renderProps(); showRTab('ai');  // AI là tab ưu tiên
   $('#undo').disabled = $('#redo').disabled = true;
   $('#total').textContent = fmt(duration());
   api = await window.TLPlayer.mount($('#player'), JSON.parse(JSON.stringify(TL)));

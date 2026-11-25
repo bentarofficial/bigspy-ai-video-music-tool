@@ -425,7 +425,8 @@ def get_job(job_id: str):
     log = (d / "log.txt").read_text(encoding="utf-8", errors="replace") if (d / "log.txt").exists() else ""
     return {**read_meta(d), "status": status_of(job_id, d), "log": log[-6000:],
             "hasVideo": (d / "video.mp4").exists(), "hasProps": (d / "props.json").exists(),
-            "hasUnexportedEdits": _has_unexported_edits(d)}
+            "hasUnexportedEdits": _has_unexported_edits(d), "hasTimeline": (d / "timeline.json").exists(),
+            "aiUndo": (d / "timeline.ai-undo.json").exists()}
 
 
 def _has_unexported_edits(d: Path) -> bool:
@@ -959,6 +960,178 @@ def fix_lyrics(job_id: str, body: dict):
     if not isinstance(tl, dict):
         raise HTTPException(400, "Thiếu timeline")
     return fix_lyrics_ops(job_id, tl, str(body.get("lyrics") or ""))
+
+
+TRANSITIONS = ["none", "dissolve-zoom", "blur-dissolve", "soft-push", "light-leak", "fade", "fadeblack", "fadewhite",
+               "flash", "slide-left", "slide-right", "slide-up", "slide-down", "wipe-left", "wipe-right", "wipe-up",
+               "wipe-down", "circle", "zoom-in", "zoom-out", "blur", "spin", "whip-left", "whip-right", "zoom-blur",
+               "glitch", "flip", "cube-left", "diamond", "split", "diag", "burn", "shake"]
+
+
+def _filter_presets() -> list[str]:
+    try:
+        src = (REMOTION_DIR / "src" / "colorFilter.tsx").read_text(encoding="utf-8")
+        return re.findall(r"^\s*([a-z0-9]+): \{name:", src, re.M)
+    except OSError:
+        return []
+
+
+def _set_key(o: dict, key: str, v):
+    *ps, last = key.split(".")
+    for p in ps:
+        if not isinstance(o.get(p), dict):
+            o[p] = {}
+        o = o[p]
+    o[last] = v
+
+
+def apply_ai_ops(tl: dict, ops: list) -> int:
+    """Áp thao tác AI lên timeline ở server (giống applyAIOps của Editor) – dùng cho trang chủ."""
+    n = 0
+    clips = tl.setdefault("clips", [])
+    tracks = tl.setdefault("tracks", [])
+    by_id = {c.get("id"): c for c in clips}
+    ok_tr = set(TRANSITIONS)
+
+    def new_track(name: str | None) -> dict:
+        t = {"id": "k" + _uid(), "kind": "mixed",
+             "name": name or f"Track {sum(1 for x in tracks if x.get('kind') == 'mixed') + 1}"}
+        tracks.insert(0, t)
+        return t
+
+    for o in ops:
+        kind = o.get("op")
+        targets = [by_id[i] for i in (o.get("ids") or ([o["id"]] if o.get("id") else [])) if i in by_id]
+        if kind == "update" and isinstance(o.get("set"), dict):
+            for c in targets:
+                for k, v in o["set"].items():
+                    if k != "id":
+                        _set_key(c, k, v)
+                if isinstance(c.get("transition"), dict) and c["transition"].get("type") not in ok_tr:
+                    c["transition"]["type"] = "fade"
+                n += 1
+        elif kind == "delete":
+            gone = {c["id"] for c in targets}
+            clips[:] = [c for c in clips if c.get("id") not in gone]
+            by_id = {c.get("id"): c for c in clips}
+            n += len(gone)
+        elif kind in ("add", "add_media") and isinstance(o.get("clip"), dict):
+            if kind == "add_media":
+                m = o.get("media") or {}
+                if m.get("type") != "video" or not str(m.get("src", "")).startswith("clips/"):
+                    continue
+                media = tl.setdefault("media", [])
+                if not any(x.get("src") == m["src"] for x in media):
+                    media.append(m)
+            c = dict(o["clip"])
+            name = c.pop("trackName", None)
+            t = next((x for x in tracks if x.get("id") == c.get("track")), None) \
+                or (name and next((x for x in tracks if x.get("name") == name), None))
+            if not t or (t.get("kind") == "main" and c.get("type") not in ("video", "image")):
+                t = new_track(name)
+            c = {"start": 0, "dur": 3, **c, "track": t["id"], "id": _uid()}
+            clips.append(c)
+            by_id[c["id"]] = c
+            n += 1
+        elif kind == "timeline" and isinstance(o.get("set"), dict):
+            for k, v in o["set"].items():
+                if k not in ("filter", "width", "height", "background"):
+                    continue
+                if k == "filter" and isinstance(v, dict):
+                    v = {**(tl.get("filter") or {}), **v}
+                    for f in ("brightness", "contrast", "saturation", "temperature", "tint", "vignette", "fade", "hue"):
+                        x = v.get(f)
+                        if isinstance(x, (int, float)) and x and abs(x) <= 1:
+                            v[f] = round(x * 100)
+                tl[k] = v
+                n += 1
+    return n
+
+
+CHAT_KEEP = 200  # số tin nhắn giữ lại trong hội thoại AI mỗi dự án
+
+
+def _chat_file(d: Path) -> Path:
+    return d / "ai_chat.json"
+
+
+def _chat_read(d: Path) -> list:
+    try:
+        return json.loads(_chat_file(d).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+
+
+def _chat_add(d: Path, *msgs: dict):
+    chat = _chat_read(d) + [{"who": m["who"], "text": str(m["text"])[:4000], "at": time.time()} for m in msgs
+                            if m.get("who") in ("me", "ai", "ai err") and m.get("text")]
+    _chat_file(d).write_text(json.dumps(chat[-CHAT_KEEP:], ensure_ascii=False), encoding="utf-8")
+
+
+@app.get("/api/jobs/{job_id}/ai-chat")
+def get_ai_chat(job_id: str):
+    return _chat_read(job_dir(job_id))
+
+
+@app.post("/api/jobs/{job_id}/ai-chat")
+def add_ai_chat(job_id: str, body: dict):
+    _chat_add(job_dir(job_id), *[m for m in body.get("messages", []) if isinstance(m, dict)])
+    return {"ok": True}
+
+
+@app.delete("/api/jobs/{job_id}/ai-chat")
+def clear_ai_chat(job_id: str):
+    _chat_file(job_dir(job_id)).unlink(missing_ok=True)
+    return {"ok": True}
+
+
+def _ai_undo_file(d: Path) -> Path:
+    return d / "timeline.ai-undo.json"
+
+
+@app.post("/api/jobs/{job_id}/ai-apply")
+def ai_apply(job_id: str, body: dict):
+    """Trang chủ: sửa timeline đã lưu bằng câu lệnh (hoặc tra & sửa lời), lưu lại và giữ 1 bản để khôi phục."""
+    d = job_dir(job_id)
+    if status_of(job_id, d) == "running":
+        raise HTTPException(409, "Dự án đang chạy")
+    tl = get_timeline(job_id)
+    before = json.dumps(tl, ensure_ascii=False)
+    text = str(body.get("prompt") or "").strip()
+    me = {"who": "me", "text": ("🔎 Tra & sửa lời phụ đề" + (" theo lời đã dán" if text else "")) if body.get("fixLyrics") else text}
+    try:
+        if body.get("fixLyrics"):
+            r = fix_lyrics_ops(job_id, tl, text)
+        else:
+            r = ai_edit(job_id, {"prompt": text, "timeline": tl, "presets": _filter_presets(), "transitions": TRANSITIONS})
+    except HTTPException as e:
+        _chat_add(d, me, {"who": "ai err", "text": "⚠ " + str(e.detail)})
+        raise
+    n = apply_ai_ops(tl, r.get("ops") or [])
+    if n:
+        _ai_undo_file(d).write_text(before, encoding="utf-8")
+        put_timeline(job_id, tl)
+    reply = (r.get("reply") or "Xong.") + (f" ({n} thay đổi)" if n else "")
+    _chat_add(d, me, {"who": "ai", "text": "✓ " + reply})
+    return {"reply": reply, "changes": n, "canUndo": _ai_undo_file(d).exists(), "chat": _chat_read(d)}
+
+
+@app.post("/api/jobs/{job_id}/ai-undo")
+def ai_undo(job_id: str):
+    d = job_dir(job_id)
+    f = _ai_undo_file(d)
+    if not f.exists():
+        raise HTTPException(404, "Không còn bản nào để khôi phục")
+    put_timeline(job_id, json.loads(f.read_text(encoding="utf-8")))
+    f.unlink()
+    _chat_add(d, {"who": "ai", "text": "↺ Đã khôi phục về trước lần sửa bằng AI gần nhất."})
+    return {"ok": True, "chat": _chat_read(d)}
+
+
+@app.post("/api/jobs/{job_id}/export-saved")
+def export_saved(job_id: str):
+    """Trang chủ: xuất MP4 từ timeline đã lưu (chỉnh sửa trong Editor hoặc bằng AI)."""
+    return export_timeline(job_id, {"timeline": get_timeline(job_id), "options": {"format": "mp4"}})
 
 
 @app.post("/api/jobs/{job_id}/media")
