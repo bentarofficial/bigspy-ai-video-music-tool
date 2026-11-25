@@ -947,7 +947,7 @@ def fix_lyrics_ops(job_id: str, tl: dict, ref_text: str = "") -> dict:
                                  "hãy dán lời đúng vào ô AI (vd: \"sửa phụ đề theo lời: ...\").", "ops": []}
             ref_text, src = ref["text"], f'{ref["source"]} (khớp {ref["score"]:.0%})'
             (d / "lyrics_reference.txt").write_text(f"# {src}\n{ref_text}", encoding="utf-8")
-    fixed, n = lyr.correct_with_reference(rec, ref_text, max_fix=12)
+    fixed, n = lyr.correct_with_reference(rec, ref_text, max_fix=12, rebreak=False)
     ops = [_line_update(c, ws) for c, ws, old in zip(clips, fixed, rec)
            if ws and [w["text"] for w in ws] != [w["text"] for w in old]]
     if not n or not ops:

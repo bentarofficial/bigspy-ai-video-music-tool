@@ -192,9 +192,13 @@ def align_lyrics(lyric_text: str, recognized: list[list[Word]], total: float) ->
     return [l for l in lines if l]
 
 
+def _ref_lines(ref_text: str) -> list[list[str]]:
+    lines = [l.strip() for l in ref_text.splitlines() if l.strip() and not l.strip().startswith(("[", "(", "#"))]
+    return [[t for t in l.split() if _norm(t)] for l in lines]
+
+
 def _ref_tokens(ref_text: str) -> list[str]:
-    lines = [l.strip() for l in ref_text.splitlines() if l.strip() and not l.strip().startswith(("[", "("))]
-    return [t for l in lines for t in l.split() if _norm(t)]
+    return [t for l in _ref_lines(ref_text) for t in l]
 
 
 def match_score(heard: str, ref_text: str) -> float:
@@ -229,7 +233,7 @@ def _anchored_opcodes(blocks, n_a: int, n_b: int) -> list[tuple]:
 
 
 def correct_with_reference(recognized: list[list[Word]], ref_text: str,
-                           max_fix: int = 6) -> tuple[list[list[Word]], int]:
+                           max_fix: int = 6, rebreak: bool = True) -> tuple[list[list[Word]], int]:
     """Sửa chữ Whisper nghe sai bằng lời chuẩn, GIỮ NGUYÊN thời gian từng chữ và cách chia dòng.
 
     - Chữ khớp (bỏ dấu): lấy chữ của lời chuẩn (sửa dấu thanh), giữ start/end.
@@ -239,7 +243,9 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
     Trả về (dòng đã sửa, số chữ đã thay đổi).
     """
     rec = [dict(w, line=li) for li, line in enumerate(recognized) for w in line]
-    ref = _ref_tokens(ref_text)
+    ref_lines = _ref_lines(ref_text)
+    ref = [t for l in ref_lines for t in l]
+    ref_li = [i for i, l in enumerate(ref_lines) for _ in l]  # chữ thứ k của lời chuẩn thuộc câu nào
     if not rec or not ref:
         return recognized, 0
     ref_n = [_norm(t) for t in ref]
@@ -253,10 +259,10 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
         for k, (tag, j1, j2, i1, i2) in enumerate(ops):
             part = span[j1:j2]
             if tag == "equal":
-                for w, t in zip(part, ref[i1:i2]):
+                for x, (w, t) in enumerate(zip(part, ref[i1:i2])):
                     if t != w["text"]:
                         changed += 1
-                    out.append(dict(w, text=t))
+                    out.append(dict(w, text=t, ref=i1 + x))
                 continue
             bounded = 0 < k < len(ops) - 1 and ops[k - 1][0] == "equal" and ops[k + 1][0] == "equal"
             n_rec, n_ref = j2 - j1, i2 - i1
@@ -273,7 +279,7 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
                         step = (b - a) / n_ref
                         s, e = a + x * step, a + (x + 1) * step
                         li = part[min(int(x * n_rec / n_ref), n_rec - 1)]["line"]
-                    out.append({"text": t, "start": round(s, 3), "end": round(e, 3), "line": li})
+                    out.append({"text": t, "start": round(s, 3), "end": round(e, 3), "line": li, "ref": i1 + x})
                 changed += max(n_rec, n_ref)
             elif bounded and small and tag == "insert" and out:
                 # Whisper bỏ sót chữ: chia thời lượng chữ đứng trước cho nó và các chữ bị sót
@@ -282,7 +288,8 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
                 step = (prev["end"] - prev["start"]) / len(words)
                 for x, t in enumerate(words):
                     out.append({"text": t, "start": round(prev["start"] + x * step, 3),
-                                "end": round(prev["start"] + (x + 1) * step, 3), "line": prev["line"]})
+                                "end": round(prev["start"] + (x + 1) * step, 3), "line": prev["line"],
+                                "ref": prev.get("ref") if x == 0 else i1 + x - 1})
                 changed += n_ref
             elif bounded and small and tag == "delete":
                 changed += n_rec  # Whisper nghe thừa chữ (lặp/ảo giác) -> bỏ
@@ -290,9 +297,10 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
                     (k == len(ops) - 1 and k > 0 and ops[k - 1][0] == "equal") or
                     (k == 0 and len(ops) > 1 and ops[1][0] == "equal")):
                 # Mép đầu/cuối clip, cạnh một đoạn khớp: lấy đúng n_rec chữ liền kề trong lời chuẩn, thay 1-1
-                seg = ref[i1:i1 + n_rec] if k > 0 else ref[max(i2 - n_rec, i1):i2]
-                for w, t in zip(part, seg):
-                    out.append(dict(w, text=_keep_sung(w, t)))
+                s0 = i1 if k > 0 else max(i2 - n_rec, i1)
+                seg = ref[s0:s0 + n_rec] if k > 0 else ref[s0:i2]
+                for x, (w, t) in enumerate(zip(part, seg)):
+                    out.append(dict(w, text=_keep_sung(w, t), ref=s0 + x))
                 out.extend(part[len(seg):])
                 changed += len(seg)
             elif n_rec >= 4 and depth < 4 and tag in ("replace", "delete"):
@@ -303,11 +311,46 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
         return out
 
     fixed = fix(rec)
+    if rebreak and sum(w.get("ref") is not None for w in fixed) >= len(fixed) * 0.6:
+        return _break_by_reference(fixed, ref_li), changed
     lines: list[list[Word]] = [[] for _ in recognized]
     for w in fixed:
         li = w.pop("line")
+        w.pop("ref", None)
         lines[li].append(w)
     return [l for l in lines if l], changed
+
+
+def _break_by_reference(words: list[dict], ref_li: list[int], max_words: int = 12,
+                        pause: float = 2.5) -> list[list[Word]]:
+    """Chia dòng phụ đề theo đúng câu của lời chuẩn (thay vì chỗ Whisper ngắt), để một câu không bị
+    vắt sang khung sau. Chữ không gắn được với lời chuẩn đi theo dòng đang chạy. Câu quá dài hoặc có
+    khoảng nghỉ dài giữa chừng thì chặt đôi."""
+    groups: list[list[dict]] = []
+    cur_li = None
+    for w in words:
+        r = w.pop("ref", None)
+        w.pop("line", None)
+        li = ref_li[r] if r is not None else cur_li
+        if not groups or (li is not None and li != cur_li):
+            groups.append([])
+        groups[-1].append(w)
+        if li is not None:
+            cur_li = li
+    out: list[list[Word]] = []
+    for g in groups:
+        parts, cur = [], [g[0]]
+        for w in g[1:]:
+            if w["start"] - cur[-1]["end"] > pause:
+                parts.append(cur)
+                cur = []
+            cur.append(w)
+        parts.append(cur)
+        for p in parts:
+            n = -(-len(p) // max_words)  # số dòng cần để mỗi dòng <= max_words
+            size = -(-len(p) // n)
+            out.extend(p[i:i + size] for i in range(0, len(p), size))
+    return out
 
 
 def to_lines(words_by_line: list[list[Word]]) -> list[dict]:

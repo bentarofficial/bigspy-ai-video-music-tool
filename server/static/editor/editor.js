@@ -404,6 +404,7 @@ function bindTimeline() {
     const c = clip(el.dataset.id);
     if (e.ctrlKey || e.metaKey || e.shiftKey) { sel.has(c.id) ? sel.delete(c.id) : (sel.add(c.id), withGroups(sel)); renderTimeline(); renderProps(); return; }
     if (!sel.has(c.id)) { sel = withGroups(new Set([c.id])); renderTimeline(); renderProps(); }
+    if (c.type === 'lyrics') rtab === 'style' ? renderSide(true) : showRTab('style');
     startClipDrag(e, c, e.target.dataset.h);
   });
   lanes.addEventListener('contextmenu', (e) => {
@@ -764,7 +765,7 @@ function renderProps() {
     field('Rộng %', 'w', 'range', {min: 2, max: 100, step: 0.5, def: 80}), field('Cao %', 'h', 'range', {min: 2, max: 100, step: 0.5, def: 14}),
   ], c) + `<div class="btnrow"><button class="ghost" data-do="cover-all">⛶ Phủ cả khung</button><button class="ghost" data-do="cover-full">↔ Kéo dài hết video</button></div>
     <p class="hint">Kéo khung trên màn hình xem trước để di chuyển, chấm góc để đổi kích thước. Dùng để che phụ đề / logo có sẵn trong clip.</p>`;
-  if (c.type === 'lyrics') h += groupHTML('Phụ đề lời bài hát', [
+  if (c.type === 'lyrics') h += lyricsEditorHTML(c) + groupHTML('Phụ đề lời bài hát', [
     ...subKindFields(c),
     field('Phông', 'subtitle.fontFamily', 'select', {opts: FONTS.map((f) => [f, f.split(',')[0]])}),
     field('Cỡ chữ', 'subtitle.fontSize', 'range', {min: 12, max: 200, step: 1}),
@@ -777,7 +778,7 @@ function renderProps() {
     field('Hiệu ứng ra', 'subtitle.animOut', 'select', {def: 'fade', opts: ANIM_OUT}),
     field('Thời lượng ra', 'subtitle.outDur', 'range', {min: 0.1, max: 2, step: 0.05, def: 0.15}),
     
-  ], c) + lyricsEditorHTML(c);
+  ], c);
   if (c.type !== 'audio' && c.type !== 'lyrics') {
     h += groupHTML('Chuyển cảnh vào', [field('Kiểu', 'transition.type', 'select', {def: 'none', opts: TRANS.map(([k, , n]) => [k, n])}),
       field('Thời lượng', 'transition.dur', 'range', {min: 0.1, max: 2, step: 0.1, def: 0.5})], c);
@@ -1034,7 +1035,8 @@ function renderSide(force) {
   if (rtab === 'style') {
     const ly = TL.clips.filter((c) => c.type === 'lyrics');
     if (!ly.length) h = `<p class="hint">Chưa có câu lời nào. Bấm <b>＋ Câu lời</b> trên thanh công cụ để thêm.</p>`;
-    else h = `<h3>Kiểu phụ đề <span class="badge">${ly.length} câu</span></h3>` + groupHTML('Chữ', [
+    else h = (lyClip() ? lyricsEditorHTML(lyClip()) : `<p class="hint">Bấm vào một câu trên timeline để sửa nội dung câu đó.</p>`)
+      + `<h3>Kiểu phụ đề <span class="badge">${ly.length} câu</span></h3>` + groupHTML('Chữ', [
       ...subKindFields(ly[0]),
       field('Phông', 'subtitle.fontFamily', 'select', {opts: FONTS.map((f) => [f, f.split(',')[0]])}),
       field('Cỡ chữ', 'subtitle.fontSize', 'range', {min: 12, max: 200, step: 1}),
@@ -1124,8 +1126,10 @@ function bindSide() {
   $$('.rbody').forEach((box) => {
     box.addEventListener('input', (e) => onInput(e, false));
     box.addEventListener('change', (e) => onInput(e, true));
+    box.addEventListener('change', (e) => { if (e.target.dataset.lf) { lyricsField(e.target); renderSide(true); } });
     box.addEventListener('click', (e) => {
       const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.ly) { lyricsAction(b.dataset.ly); return renderSide(true); }
       if (b.dataset.fp) {
         if (b.dataset.fp === 'none') delete TL.filter;
         else TL.filter = {...(TL.filter || {}), preset: b.dataset.fp, intensity: TL.filter?.intensity ?? 0.8};

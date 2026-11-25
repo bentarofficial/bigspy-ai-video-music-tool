@@ -1189,7 +1189,7 @@ async function refresh() {
   }
   const running = j.status === 'running';
   if (running) renderProgress(j.log || '');
-  $('#aiCard').hidden = !(j.hasProps || j.hasTimeline) || (running && !j.lastExport);
+  $('#aiCard').hidden = true;  // Sửa bằng AI chỉ có trong Studio (Editor), không hiện ở trang chủ
   if (!$('#aiLog .aimsg.wait:last-child')) ['#aiSend', '#aiLyrics', '#aiUndo', '#exportVid'].forEach(s => $(s).disabled = running);
   $('#exportVid').textContent = running ? 'Đang xuất…' : '⬆ Xuất video';
   $('#exportVid').classList.toggle('ghost', !j.hasUnexportedEdits);
