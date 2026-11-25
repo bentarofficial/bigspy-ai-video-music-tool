@@ -773,9 +773,9 @@ function renderProps() {
     field('Màu viền', 'subtitle.strokeColor', 'color'), field('Độ dày viền', 'subtitle.strokeWidth', 'range', {min: 0, max: 16, step: 1}),
     field('Vị trí', 'subtitle.position', 'select', {opts: [['bottom', 'Dưới'], ['center', 'Giữa'], ['top', 'Trên']]}),
     field('Viết hoa', 'subtitle.uppercase', 'check'),
-    field('Hiệu ứng vào', 'subtitle.animIn', 'select', {def: '', opts: [['', 'Mặc định (trồi nhẹ)'], ...ANIM_IN.filter((a) => a[0] !== 'typewriter' && a[0] !== 'none'), ['none', 'Không']]}),
+    field('Hiệu ứng vào', 'subtitle.animIn', 'select', {def: '', opts: [['', 'Mặc định (trồi nhẹ)'], ['random', 'Ngẫu nhiên – mỗi câu một kiểu'], ...ANIM_IN.filter((a) => a[0] !== 'typewriter' && a[0] !== 'none'), ['none', 'Không']]}),
     field('Thời lượng vào', 'subtitle.inDur', 'range', {min: 0.1, max: 2, step: 0.05, def: 0.3}),
-    field('Hiệu ứng ra', 'subtitle.animOut', 'select', {def: 'fade', opts: ANIM_OUT}),
+    field('Hiệu ứng ra', 'subtitle.animOut', 'select', {def: 'fade', opts: [['random', 'Ngẫu nhiên – mỗi câu một kiểu'], ...ANIM_OUT]}),
     field('Thời lượng ra', 'subtitle.outDur', 'range', {min: 0.1, max: 2, step: 0.05, def: 0.15}),
     
   ], c);
@@ -1098,9 +1098,9 @@ function renderSide(force) {
       field('Phông', 'subtitle.fontFamily', 'select', {opts: FONTS.map((f) => [f, f.split(',')[0]])}),
       field('Cỡ chữ', 'subtitle.fontSize', 'range', {min: 12, max: 200, step: 1}),
       field('Viết hoa', 'subtitle.uppercase', 'check'),
-    field('Hiệu ứng vào', 'subtitle.animIn', 'select', {def: '', opts: [['', 'Mặc định (trồi nhẹ)'], ...ANIM_IN.filter((a) => a[0] !== 'typewriter' && a[0] !== 'none'), ['none', 'Không']]}),
+    field('Hiệu ứng vào', 'subtitle.animIn', 'select', {def: '', opts: [['', 'Mặc định (trồi nhẹ)'], ['random', 'Ngẫu nhiên – mỗi câu một kiểu'], ...ANIM_IN.filter((a) => a[0] !== 'typewriter' && a[0] !== 'none'), ['none', 'Không']]}),
     field('Thời lượng vào', 'subtitle.inDur', 'range', {min: 0.1, max: 2, step: 0.05, def: 0.3}),
-    field('Hiệu ứng ra', 'subtitle.animOut', 'select', {def: 'fade', opts: ANIM_OUT}),
+    field('Hiệu ứng ra', 'subtitle.animOut', 'select', {def: 'fade', opts: [['random', 'Ngẫu nhiên – mỗi câu một kiểu'], ...ANIM_OUT]}),
     field('Thời lượng ra', 'subtitle.outDur', 'range', {min: 0.1, max: 2, step: 0.05, def: 0.15}),
     
     ], ly[0]) + groupHTML('Màu', [

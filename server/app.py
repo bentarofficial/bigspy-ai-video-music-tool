@@ -1354,7 +1354,7 @@ def tiktok_get_settings():
 
 def _caption(meta: dict) -> str:
     title = re.sub(r"\.(wav|mp3|m4a|flac|ogg|aac)$", "", meta.get("title") or "", flags=re.I).strip()
-    return f"{title} {os.environ.get('TIKTOK_HASHTAGS', DEFAULT_TAGS)}".strip()
+    return f"{title} {_merge_tags(os.environ.get('TIKTOK_HASHTAGS', DEFAULT_TAGS))}".strip()
 
 
 CAPTION_PROMPT = """Bạn viết caption TikTok tiếng Việt cho một video nhạc.
@@ -1368,7 +1368,7 @@ Yêu cầu:
 - Viết 1–2 câu ngắn (tổng dưới 150 ký tự), cảm xúc, tự nhiên như người thật đăng TikTok.
 - Lấy ý từ tên bài và tinh thần lời bài hát, KHÔNG chép nguyên câu nào trong lời.
 - Có thể dùng 1 emoji hợp cảm xúc. Không bao caption trong dấu ngoặc kép.
-- Chọn thêm 3–5 hashtag hợp tâm trạng bài (tiếng Việt không dấu hoặc tiếng Anh, vd: #nhactamtrang #hoainiem #chill).
+- Chọn thêm 2–4 hashtag hợp tâm trạng bài (tiếng Việt không dấu hoặc tiếng Anh, vd: #nhactamtrang #hoainiem #chill).
 {variant}
 Chỉ trả về JSON một dòng: {{"caption": "...", "hashtags": ["#a", "#b"]}}"""
 
@@ -1397,6 +1397,21 @@ def _lyrics_text(d: Path) -> str:
     return ""
 
 
+MAX_TAGS = 5  # TikTok hiện chỉ cho tối đa 5 hashtag mỗi video
+
+
+def _cap_tags(text: str) -> str:
+    """Giữ tối đa MAX_TAGS hashtag đầu tiên trong caption, bỏ phần dư."""
+    n = 0
+
+    def keep(m):
+        nonlocal n
+        n += 1
+        return m.group(0) if n <= MAX_TAGS else ""
+    out = re.sub(r"\s*#\w+", keep, text)
+    return re.sub(r"[ \t]+\n", "\n", out).strip()
+
+
 def _merge_tags(*groups) -> str:
     seen, out = set(), []
     for g in groups:
@@ -1405,7 +1420,7 @@ def _merge_tags(*groups) -> str:
             if len(t) > 1 and t.lower() not in seen:
                 seen.add(t.lower())
                 out.append(t)
-    return " ".join(out)
+    return " ".join(out[:MAX_TAGS])
 
 
 @app.post("/api/jobs/{job_id}/tiktok/caption")
@@ -1433,14 +1448,14 @@ def ai_caption(job_id: str, body: dict | None = None):
     cap = str(data.get("caption") or "").strip().strip('"').strip()
     if not cap:
         raise HTTPException(500, "AI trả lời không đúng định dạng — bấm Viết lại.")
-    tags = _merge_tags(data.get("hashtags") or [], os.environ.get("TIKTOK_HASHTAGS", DEFAULT_TAGS))
+    tags = _merge_tags(os.environ.get("TIKTOK_HASHTAGS", DEFAULT_TAGS), data.get("hashtags") or [])
     return {"caption": f"{cap}\n\n{tags}"}
 
 
 @app.get("/api/jobs/{job_id}/tiktok")
 def job_tiktok(job_id: str):
     meta = read_meta(job_dir(job_id))
-    return {**(meta.get("tiktok") or {}), "caption": meta.get("caption") or _caption(meta), "saved": bool(meta.get("caption"))}
+    return {**(meta.get("tiktok") or {}), "caption": _cap_tags(meta.get("caption") or _caption(meta)), "saved": bool(meta.get("caption"))}
 
 
 @app.post("/api/jobs/{job_id}/tiktok")
@@ -1455,7 +1470,7 @@ def send_tiktok(job_id: str, body: dict | None = None):
     if cur.get("state") in {"exporting", "starting", "uploading", "processing"} and time.time() - cur.get("at", 0) < 900:
         raise HTTPException(409, "Video này đang được gửi lên TikTok.")
     tiktok.access_token()  # báo lỗi ngay nếu chưa kết nối
-    caption = str((body or {}).get("caption", "")).strip()[:2200]
+    caption = _cap_tags(str((body or {}).get("caption", "")).strip()[:2200])
 
     def set_state(s: dict):
         m = read_meta(d)

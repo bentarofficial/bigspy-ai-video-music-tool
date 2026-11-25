@@ -20,7 +20,7 @@ const CharWord: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, nu
 	const text = (s.uppercase ? w.text.toUpperCase() : w.text).normalize('NFC');
 	const chars = Array.from(text);
 	const n = chars.length || 1;
-	const dw = Math.max(w.end - w.start, 0.15);
+	const dw = Math.max(w.end - w.start, 0.08);
 	const stroke: React.CSSProperties = {WebkitTextStroke: `${s.strokeWidth}px ${s.strokeColor}`, paintOrder: 'stroke fill'};
 	return (
 		<span
@@ -42,7 +42,12 @@ const CharWord: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, nu
 					op = k; blur = (1 - k) * 5; ty = (1 - k) * 0.14;
 					sung = ramp(t, w.start + dw * f, 0.22);
 				} else if (s.mode === 'glow') {
-					k = ramp(t, w.start + dw * f - 0.05, 0.55);
+					// sáng đúng lúc hát: bắt đầu ngay khi tới ký tự (trễ nhẹ bù cho mốc thời gian nhận dạng thường sớm),
+			// tăng đều (smoothstep) thay vì bật gần hết ngay khung đầu như ease-out
+			const a = w.start + 0.08 + dw * f;
+			// tốc độ sáng = tốc độ hát: mỗi ký tự sáng trong đúng phần thời gian của nó trong chữ
+			// (hát nhanh -> sáng nhanh, ngân dài -> sáng chậm), không ép thời lượng tối thiểu dài
+			k = ease(interpolate(t, [a, a + Math.max(0.06, (dw / n) * 1.3)], [0, 1], clamp));
 					op = 0.4 + 0.6 * k; glow = k;
 				} else if (s.mode === 'mist') {
 					k = ramp(t, w.start + dw * f - 0.3, 0.8);
@@ -110,8 +115,14 @@ const Word: React.FC<{w: W; t: number; s: SubtitleStyle; reveal: [number, number
 	);
 };
 
-const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: number; dim?: boolean; until: number}> = ({
+// "Ngẫu nhiên": mỗi câu một hiệu ứng (cố định theo số thứ tự câu -> xem trước và xuất ra giống nhau)
+const RAND_IN = ['fade', 'zoom', 'pop', 'rise', 'drop', 'slide-up', 'slide-left', 'slide-right', 'blur', 'flip', 'stretch', 'word-pop', 'word-rise', 'word-fade'];
+const RAND_OUT = ['fade', 'zoom-out', 'zoom-in', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'blur', 'flip', 'drop'];
+const pick = (list: string[], i: number, salt: number) => list[Math.abs((i + 1) * 2654435761 + salt * 40503) % list.length];
+
+const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: number; dim?: boolean; until: number; idx?: number}> = ({
 	line,
+	idx = 0,
 	t,
 	s,
 	scale = 1,
@@ -123,7 +134,12 @@ const LineView: React.FC<{line: Line; t: number; s: SubtitleStyle; scale?: numbe
 	const hideAt = Math.max(until, line.end + HOLD);
 	const {fps, width} = useVideoConfig();
 	const D = width * 0.12;
-	const animIn = s.animIn, animOut = s.animOut ?? 'fade';
+	let animIn = s.animIn, animOut = s.animOut ?? 'fade';
+	if (animIn === 'random') {
+		animIn = pick(RAND_IN, idx, 1);
+		if (idx > 0 && animIn === pick(RAND_IN, idx - 1, 1)) animIn = RAND_IN[(RAND_IN.indexOf(animIn) + 1) % RAND_IN.length];
+	}
+	if (animOut === 'random') animOut = pick(RAND_OUT, idx, 7);
 	const inF = Math.round((s.inDur ?? 0.3) * fps), outF = Math.round((s.outDur ?? (s.animOut ? 0.3 : 0.15)) * fps);
 	const fIn = (t - shownAt) * fps, rOut = Number.isFinite(hideAt) ? (hideAt - t) * fps : 1e9;
 	const perWord = !!animIn?.startsWith('word-');
@@ -202,10 +218,10 @@ export const Subtitles: React.FC<{lines: Line[]; s: SubtitleStyle}> = ({lines, s
 				gap: s.fontSize * 0.3,
 			}}
 		>
-			{visible ? <LineView key={idx} line={line} t={t} s={s} until={until} /> : null}
+			{visible ? <LineView key={idx} idx={idx} line={line} t={t} s={s} until={until} /> : null}
 			{/* full: hiện trước cả câu tiếp theo (mờ, nhỏ hơn) */}
 			{s.mode === 'full' && visible && next ? (
-				<LineView key={`n${idx}`} line={{...next, start: line.start, end: line.end}} t={t} s={s} scale={0.75} dim until={until} />
+				<LineView key={`n${idx}`} line={{...next, start: line.start, end: line.end}} t={t} s={s} scale={0.75} dim until={until} idx={idx + 1} />
 			) : null}
 		</AbsoluteFill>
 	);
