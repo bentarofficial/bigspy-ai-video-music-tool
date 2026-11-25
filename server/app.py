@@ -824,6 +824,9 @@ def ai_edit(job_id: str, body: dict):
     job_dir(job_id)
     req = (body.get("prompt") or "").strip()
     tl = body.get("timeline")
+    images = [p for n in (body.get("images") or [])[:6] if (p := _ai_image_path(job_id, str(n))).exists()]
+    if images and not req:
+        req = "Xem ảnh đính kèm: tìm chỗ bị lỗi trên video và sửa lại cho đúng."
     if not req or not isinstance(tl, dict):
         raise HTTPException(400, "Thiếu câu lệnh hoặc timeline")
     if not llm.available():
@@ -834,7 +837,7 @@ def ai_edit(job_id: str, body: dict):
               .replace("{transitions}", ", ".join(body.get("transitions") or []) or "fade, slide-left, wipe-left")
               .replace("{request}", req))
     try:
-        out = llm.ask(prompt, effort="low", timeout=300)
+        out = llm.ask(prompt, effort="low", timeout=300, images=[str(p) for p in images])
     except Exception as e:
         raise HTTPException(500, f"AI lỗi: {e}")
     m = re.search(r"\{.*\}", out, re.S)
@@ -1050,6 +1053,37 @@ def apply_ai_ops(tl: dict, ops: list) -> int:
 
 
 CHAT_KEEP = 200  # số tin nhắn giữ lại trong hội thoại AI mỗi dự án
+AI_IMG_RE = re.compile(r"^[a-z0-9]{6,32}\.(jpg|png|webp)$")
+
+
+def _ai_image_path(job_id: str, name: str) -> Path:
+    if not AI_IMG_RE.match(name):
+        raise HTTPException(400, "Tên ảnh không hợp lệ")
+    return job_dir(job_id) / "ai_images" / name
+
+
+@app.post("/api/jobs/{job_id}/ai-image")
+async def upload_ai_image(job_id: str, file: UploadFile = File(...)):
+    """Ảnh người dùng dán/kéo vào khung chat AI (chụp chỗ lỗi) -> lưu trong dự án để AI xem."""
+    ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}.get(file.content_type or "")
+    if not ext:
+        raise HTTPException(400, "Chỉ nhận ảnh JPG, PNG hoặc WEBP")
+    data = await file.read()
+    if len(data) > 15_000_000:
+        raise HTTPException(400, "Ảnh quá lớn (tối đa 15 MB)")
+    name = f"{secrets.token_hex(8)}.{ext}"
+    p = _ai_image_path(job_id, name)
+    p.parent.mkdir(exist_ok=True)
+    p.write_bytes(data)
+    return {"name": name}
+
+
+@app.get("/api/jobs/{job_id}/ai-image/{name}")
+def get_ai_image(job_id: str, name: str):
+    p = _ai_image_path(job_id, name)
+    if not p.exists():
+        raise HTTPException(404, "Không có ảnh")
+    return FileResponse(p)
 
 
 def _chat_file(d: Path) -> Path:
@@ -1064,8 +1098,10 @@ def _chat_read(d: Path) -> list:
 
 
 def _chat_add(d: Path, *msgs: dict):
-    chat = _chat_read(d) + [{"who": m["who"], "text": str(m["text"])[:4000], "at": time.time()} for m in msgs
-                            if m.get("who") in ("me", "ai", "ai err") and m.get("text")]
+    chat = _chat_read(d) + [{"who": m["who"], "text": str(m.get("text") or "")[:4000], "at": time.time(),
+                             **({"images": [n for n in m["images"][:6] if AI_IMG_RE.match(str(n))]}
+                                if isinstance(m.get("images"), list) and m["images"] else {})}
+                            for m in msgs if m.get("who") in ("me", "ai", "ai err") and (m.get("text") or m.get("images"))]
     _chat_file(d).write_text(json.dumps(chat[-CHAT_KEEP:], ensure_ascii=False), encoding="utf-8")
 
 
@@ -1083,6 +1119,7 @@ def add_ai_chat(job_id: str, body: dict):
 @app.delete("/api/jobs/{job_id}/ai-chat")
 def clear_ai_chat(job_id: str):
     _chat_file(job_dir(job_id)).unlink(missing_ok=True)
+    shutil.rmtree(job_dir(job_id) / "ai_images", ignore_errors=True)
     return {"ok": True}
 
 

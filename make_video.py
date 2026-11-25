@@ -173,10 +173,8 @@ def main() -> None:
         recognized = lyrics.transcribe(asr_input, a.whisper_model, a.lang, hint)
         clipped = a.start is not None or a.end is not None
         lyrics.VARIANT_LOG.clear()
-        if a.lyrics and not clipped:
-            print("  căn lời bài hát của bạn vào giọng hát")
-            words = lyrics.align_lyrics(Path(a.lyrics).read_text(encoding="utf-8"), recognized, total)
-        else:
+        # Luôn trích xuất phụ đề từ giọng hát trước (giữ chỗ ca sĩ ngắt nhịp), lời dán chỉ để đối chiếu sửa chữ
+        if True:
             # Đã trích xuất xong -> tìm lời chuẩn (dán sẵn / LRCLIB / web) -> chỉ sửa chữ sai, giữ timing
             words = recognized
             ref = None
@@ -193,7 +191,7 @@ def main() -> None:
                 else:
                     print("  ⚠ Không tìm được lời chuẩn khớp -> giữ phụ đề Whisper (có thể dán lời để sửa)")
             if ref:
-                words, n = lyrics.correct_with_reference(recognized, ref["text"])
+                words, n = lyrics.correct_with_reference(recognized, ref["text"], audio=asr_input)
                 print(f"  ✔ Sửa {n} chữ theo {ref['source']} (giữ nguyên thời gian karaoke)")
         if lyrics.VARIANT_LOG:
             print(f"  ✔ Giữ {len(lyrics.VARIANT_LOG)} chữ theo giọng hát thay vì lời dán "

@@ -233,7 +233,7 @@ def _anchored_opcodes(blocks, n_a: int, n_b: int) -> list[tuple]:
 
 
 def correct_with_reference(recognized: list[list[Word]], ref_text: str,
-                           max_fix: int = 6, rebreak: bool = True) -> tuple[list[list[Word]], int]:
+                           max_fix: int = 6, rebreak: bool = True, audio: Path | None = None) -> tuple[list[list[Word]], int]:
     """Sửa chữ Whisper nghe sai bằng lời chuẩn, GIỮ NGUYÊN thời gian từng chữ và cách chia dòng.
 
     - Chữ khớp (bỏ dấu): lấy chữ của lời chuẩn (sửa dấu thanh), giữ start/end.
@@ -312,7 +312,7 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
 
     fixed = fix(rec)
     if rebreak and sum(w.get("ref") is not None for w in fixed) >= len(fixed) * 0.6:
-        return _break_by_reference(fixed, ref_li), changed
+        return _break_by_reference(fixed, ref_li, vocal_envelope(audio) if audio else None), changed
     lines: list[list[Word]] = [[] for _ in recognized]
     for w in fixed:
         li = w.pop("line")
@@ -321,11 +321,67 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
     return [l for l in lines if l], changed
 
 
-def _break_by_reference(words: list[dict], ref_li: list[int], max_words: int = 12,
+ENV_HOP = 0.05  # giây / điểm của đường độ lớn giọng hát
+
+
+def vocal_envelope(audio: Path):
+    """Độ lớn dải tần giọng hát (250–3500 Hz) mỗi 50ms — để tìm chỗ ca sĩ ngừng/ngắt nhịp."""
+    try:
+        import numpy as np
+        import soundfile as sf
+        x, sr = sf.read(str(audio), dtype="float32", always_2d=False)
+        if x.ndim > 1:
+            x = x.mean(axis=1)
+        X = np.fft.rfft(x)
+        f = np.fft.rfftfreq(len(x), 1 / sr)
+        X[(f < 250) | (f > 3500)] = 0
+        v = np.fft.irfft(X, len(x))
+        h = int(sr * ENV_HOP)
+        return np.sqrt(np.convolve(v ** 2, np.ones(h) / h, "same"))[::h]
+    except Exception as e:  # thiếu thư viện / file lỗi -> chỉ chia theo câu của lời
+        print(f"  (không đo được chỗ ngắt nhịp: {e})")
+        return None
+
+
+def _split_at_pauses(p: list[dict], env, min_words: int = 8, min_part: int = 3,
+                     min_quiet: float = 0.8) -> list[list[dict]]:
+    """Câu dài: nếu giữa câu có quãng lặng giọng hát (ca sĩ ngắt nhịp) thì tách tại chữ gần đầu quãng lặng."""
+    if env is None or len(p) < min_words:
+        return [p]
+    import numpy as np
+    a, b = int(p[0]["start"] / ENV_HOP), int(p[-1]["end"] / ENV_HOP)
+    seg = env[a:b]
+    if len(seg) < 10:
+        return [p]
+    quiet = seg < 0.7 * float(np.median(seg))
+    best, i = None, 0
+    while i < len(quiet):  # quãng lặng dài nhất, không tính sát đầu/cuối câu
+        if quiet[i]:
+            j = i
+            while j < len(quiet) and quiet[j]:
+                j += 1
+            t0, t1 = (a + i) * ENV_HOP, (a + j) * ENV_HOP
+            if (t1 - t0 >= min_quiet and t0 > p[0]["start"] + 0.3 and t1 < p[-1]["end"] - 0.3
+                    and (best is None or t1 - t0 > best[1] - best[0])):
+                best = (t0, t1)
+            i = j
+        else:
+            i += 1
+    if not best:
+        return [p]
+    # tách sau chữ cuối cùng kết thúc trước (hoặc ngay đầu) quãng lặng
+    ks = [k for k in range(min_part, len(p) - min_part + 1) if p[k - 1]["end"] <= best[0] + 0.1]
+    k = max(ks) if ks else None
+    if k is None:
+        return [p]
+    return _split_at_pauses(p[:k], env) + _split_at_pauses(p[k:], env)
+
+
+def _break_by_reference(words: list[dict], ref_li: list[int], env=None, max_words: int = 12,
                         pause: float = 2.5) -> list[list[Word]]:
-    """Chia dòng phụ đề theo đúng câu của lời chuẩn (thay vì chỗ Whisper ngắt), để một câu không bị
-    vắt sang khung sau. Chữ không gắn được với lời chuẩn đi theo dòng đang chạy. Câu quá dài hoặc có
-    khoảng nghỉ dài giữa chừng thì chặt đôi."""
+    """Chia dòng phụ đề: không bao giờ vắt một câu của lời chuẩn sang câu khác; trong một câu thì ngắt
+    tại chỗ ca sĩ ngừng hát (đo trên audio) như cách ca sĩ ngắt nhịp. Chữ không gắn được với lời chuẩn
+    đi theo dòng đang chạy. Câu vẫn quá dài thì chặt đôi."""
     groups: list[list[dict]] = []
     cur_li = None
     for w in words:
@@ -346,7 +402,7 @@ def _break_by_reference(words: list[dict], ref_li: list[int], max_words: int = 1
                 cur = []
             cur.append(w)
         parts.append(cur)
-        for p in parts:
+        for p in [q for part in parts for q in _split_at_pauses(part, env)]:
             n = -(-len(p) // max_words)  # số dòng cần để mỗi dòng <= max_words
             size = -(-len(p) // n)
             out.extend(p[i:i + size] for i in range(0, len(p), size))

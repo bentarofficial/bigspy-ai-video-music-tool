@@ -246,6 +246,12 @@ input[type=checkbox]{accent-color:var(--acc);width:15px;height:15px}
 .aimsg.ai{align-self:flex-start;background:rgba(255,255,255,.06)}
 .aimsg.wait{opacity:.6}.aimsg.err{color:#fca5a5}
 .aiex{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.aiex .ghost{font-size:11px;padding:4px 8px;text-align:left}
+.aiatt{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.aithumb{position:relative;display:inline-block}
+.aithumb img{height:56px;max-width:96px;object-fit:cover;border-radius:6px;border:1px solid var(--line2);display:block}
+.aithumb button{position:absolute;top:-6px;right:-6px;width:18px;height:18px;padding:0;border-radius:50%;font-size:12px;line-height:1;background:#111827;border:1px solid var(--line2);color:#fff;cursor:pointer}
+.aimg{display:block;max-width:100%;max-height:160px;border-radius:6px;margin-bottom:4px}
+.aidrop{outline:2px dashed rgba(96,165,250,.7);outline-offset:-4px}
 #aiIn{width:100%;box-sizing:border-box;resize:vertical;margin-bottom:6px}
 #aiSend:disabled{opacity:.6}
 .cliptip{position:fixed;z-index:9999;pointer-events:none;max-width:420px;background:#111827;border:1px solid var(--line2);border-radius:8px;padding:6px 10px;box-shadow:0 6px 20px rgba(0,0,0,.5);display:flex;flex-direction:column;gap:2px}

@@ -911,15 +911,66 @@ function renderAI(box) {
   box.innerHTML = `<h3>Sửa bằng AI</h3>
     <div class="ailog" id="aiLog"></div>
     <div class="aiex">${AI_EXAMPLES.map((x) => `<button class="ghost" data-aiex="${esc(x)}">${esc(x)}</button>`).join('')}</div>
-    <textarea id="aiIn" rows="3" placeholder="Mô tả thay đổi bạn muốn… (Ctrl+Enter để gửi)"></textarea>
-    <div class="btnrow"><button class="ghost" id="aiSend">✦ Gửi cho AI</button><button class="ghost" id="aiLyrics" title="Tra lời bài hát trên mạng, đối chiếu và sửa chữ phụ đề sai (giữ thời gian karaoke). Nếu ô bên trên có lời bài hát thì dùng lời đó.">🔎 Tra & sửa lời phụ đề</button></div>
+    <div class="aiatt" id="aiAtt" hidden></div>
+    <textarea id="aiIn" rows="3" placeholder="Mô tả thay đổi bạn muốn, có thể dán (Ctrl+V) hoặc kéo ảnh chụp lỗi vào đây… (Ctrl+Enter để gửi)"></textarea>
+    <input type="file" id="aiFile" accept="image/png,image/jpeg,image/webp" multiple hidden>
+    <div class="btnrow"><button class="ghost" id="aiPick" title="Đính kèm ảnh chụp chỗ bị lỗi">📎 Ảnh</button><button class="ghost" id="aiSend">✦ Gửi cho AI</button><button class="ghost" id="aiLyrics" title="Tra lời bài hát trên mạng, đối chiếu và sửa chữ phụ đề sai (giữ thời gian karaoke). Nếu ô bên trên có lời bài hát thì dùng lời đó.">🔎 Tra & sửa lời phụ đề</button></div>
     <p class="hint">AI đọc timeline hiện tại (và clip đang chọn) rồi tự chỉnh. Không ưng thì Hoàn tác (Ctrl+Z).</p>`;
   drawAILog();
   $$('[data-aiex]', box).forEach((b) => (b.onclick = () => { $('#aiIn').value = b.dataset.aiex; $('#aiIn').focus(); }));
   $('#aiSend').onclick = () => sendAI();
   $('#aiLyrics').onclick = () => sendAI(true);
   $('#aiIn').onkeydown = (e) => { e.stopPropagation(); if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) sendAI(); };
+  $('#aiPick').onclick = () => $('#aiFile').click();
+  $('#aiFile').onchange = (e) => { addAIImages([...e.target.files]); e.target.value = ''; };
+  $('#aiIn').addEventListener('paste', (e) => {
+    const fs = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'));
+    if (fs.length) { e.preventDefault(); addAIImages(fs); }
+  });
+  box.addEventListener('dragover', (e) => { if ([...e.dataTransfer.types].includes('Files')) { e.preventDefault(); box.classList.add('aidrop'); } });
+  box.addEventListener('dragleave', (e) => { if (!box.contains(e.relatedTarget)) box.classList.remove('aidrop'); });
+  box.addEventListener('drop', (e) => {
+    const fs = [...e.dataTransfer.files].filter((f) => f.type.startsWith('image/'));
+    box.classList.remove('aidrop'); if (!fs.length) return;
+    e.preventDefault(); e.stopPropagation(); addAIImages(fs);
+  });
+  drawAIAtt();
 }
+/* Ảnh đính kèm (chụp chỗ lỗi) – thu nhỏ còn tối đa 1600px để gửi nhanh, AI vẫn đọc rõ chữ */
+const aiAtt = [];  // [{blob, url}]
+const AI_MAX_IMG = 6;
+async function shrinkImage(f) {
+  try {
+    const bmp = await createImageBitmap(f), k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    if (k === 1 && f.size < 3e6) return f;
+    const cv = Object.assign(document.createElement('canvas'), {width: Math.round(bmp.width * k), height: Math.round(bmp.height * k)});
+    cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    return await new Promise((res) => cv.toBlob((b) => res(b || f), 'image/jpeg', 0.9));
+  } catch { return f; }
+}
+async function addAIImages(files) {
+  for (const f of files) {
+    if (aiAtt.length >= AI_MAX_IMG) { toast(`Tối đa ${AI_MAX_IMG} ảnh mỗi lần gửi`); break; }
+    const blob = await shrinkImage(f);
+    aiAtt.push({blob, url: URL.createObjectURL(blob)});
+  }
+  drawAIAtt(); $('#aiIn')?.focus();
+}
+function drawAIAtt() {
+  const el = $('#aiAtt'); if (!el) return;
+  el.hidden = !aiAtt.length;
+  el.innerHTML = aiAtt.map((a, i) => `<span class="aithumb"><img src="${a.url}" alt=""><button data-drop-img="${i}" title="Bỏ ảnh này">×</button></span>`).join('');
+  $$('[data-drop-img]', el).forEach((b) => (b.onclick = () => { const [a] = aiAtt.splice(+b.dataset.dropImg, 1); URL.revokeObjectURL(a.url); drawAIAtt(); }));
+}
+async function uploadAIImages() {
+  const names = [];
+  for (const a of aiAtt) {
+    const fd = new FormData(); fd.append('file', a.blob, a.blob.type === 'image/png' ? 'a.png' : 'a.jpg');
+    names.push((await apiCall(`/api/jobs/${JOB}/ai-image`, {method: 'POST', body: fd})).name);
+  }
+  return names;
+}
+const aiImgURL = (n) => `/api/jobs/${JOB}/ai-image/${encodeURIComponent(n)}`;
 /* Bản lưu trước mỗi lần AI sửa (giữ 10 bản, còn cả sau khi tải lại trang) -> "khôi phục lại" không cần gọi AI. */
 const AI_SNAP_KEY = `ed.aisnaps.${JOB}`;
 let aiSnaps = []; try { aiSnaps = JSON.parse(localStorage.getItem(AI_SNAP_KEY) || '[]'); } catch {}
@@ -935,7 +986,7 @@ function restoreAI(all) {
 }
 function drawAILog() {
   const el = $('#aiLog'); if (!el) return;
-  el.innerHTML = aiLog.map((m) => `<div class="aimsg ${m.who}">${esc(m.text)}</div>`).join('') || '<p class="hint">Chọn một ví dụ bên dưới hoặc tự nhập câu lệnh.</p>';
+  el.innerHTML = aiLog.map((m) => `<div class="aimsg ${m.who}">${(m.images || []).map((n) => `<a href="${aiImgURL(n)}" target="_blank"><img class="aimg" src="${aiImgURL(n)}" alt=""></a>`).join('')}${esc(m.text || '')}</div>`).join('') || '<p class="hint">Chọn một ví dụ bên dưới hoặc tự nhập câu lệnh.</p>';
   const done = aiLog.some((m) => m.who !== 'ai wait');
   if (aiSnaps.length || done) el.insertAdjacentHTML('beforeend', `<div class="btnrow">${aiSnaps.length ? `<button class="ghost" id="aiUndo">↺ Khôi phục lần trước</button>` : ''}${aiSnaps.length > 1 ? `<button class="ghost" id="aiUndoAll">↺ Về như ban đầu (${aiSnaps.length})</button>` : ''}${done ? '<button class="ghost" id="aiClear" title="Xoá toàn bộ hội thoại AI của dự án này">🗑 Xoá hội thoại</button>' : ''}</div>`);
   const one = (all) => { const m = {who: 'ai', text: '↺ ' + restoreAI(all)}; aiLog.push(m); aiSave(m); drawAILog(); };
@@ -946,9 +997,15 @@ function drawAILog() {
 }
 async function sendAI(fixLyrics = false) {
   const inp = $('#aiIn'), btn = $(fixLyrics ? '#aiLyrics' : '#aiSend'), label = btn.textContent, text = inp.value.trim();
-  if ((!text && !fixLyrics) || btn.disabled) return;
-  if (RESTORE_RE.test(text)) { inp.value = ''; const ms = [{who: 'me', text}, {who: 'ai', text: '↺ ' + restoreAI(ALL_RE.test(text))}]; aiLog.push(...ms); aiSave(...ms); return drawAILog(); }
+  if ((!text && !fixLyrics && !aiAtt.length) || btn.disabled) return;
+  if (RESTORE_RE.test(text) && !aiAtt.length) { inp.value = ''; const ms = [{who: 'me', text}, {who: 'ai', text: '↺ ' + restoreAI(ALL_RE.test(text))}]; aiLog.push(...ms); aiSave(...ms); return drawAILog(); }
   const me = {who: 'me', text: fixLyrics ? '🔎 Tra & sửa lời phụ đề' + (text ? ' theo lời đã dán' : '') : text};
+  if (!fixLyrics && aiAtt.length) {
+    btn.disabled = true;
+    try { me.images = await uploadAIImages(); }
+    catch (e) { btn.disabled = false; return toast('Không gửi được ảnh: ' + e.message); }
+    aiAtt.splice(0).forEach((a) => URL.revokeObjectURL(a.url)); drawAIAtt();
+  }
   aiLog.push(me); inp.value = '';
   btn.disabled = true; btn.textContent = fixLyrics ? 'Đang tra lời…' : 'AI đang làm…';
   const started = Date.now();
@@ -960,7 +1017,7 @@ async function sendAI(fixLyrics = false) {
       ? await apiCall(`/api/jobs/${JOB}/fix-lyrics`, {method: 'POST', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({timeline: TL, lyrics: text})})
       : await apiCall(`/api/jobs/${JOB}/ai-edit`, {method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({prompt: text, timeline: TL, selected: [...sel],
+          body: JSON.stringify({prompt: text, images: me.images || [], timeline: TL, selected: [...sel],
             presets: Object.keys(window.TLPlayer?.FILTER_PRESETS || {}), transitions: TRANS.map((t) => t[0])})});
     const before = snap(), n = applyAIOps(r.ops || []);
     if (n) { aiSnaps.push(before); if (aiSnaps.length > 10) aiSnaps.shift(); saveAISnaps(); }
