@@ -363,8 +363,8 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
         </div>
         <label class="switch"><span>Tạo video có phụ đề<small>Bỏ tích: video chỉ có cảnh, không tách giọng, không nhận diện hay tìm lời bài hát (nhanh hơn nhiều)</small></span><input type="checkbox" name="with_subs" checked></label>
         <div class="needs-subs">
-          <label>Lời bài hát <span style="color:var(--dim)">· không bắt buộc, giúp phụ đề chính xác hơn nhiều</span></label>
-          <textarea name="lyrics" placeholder="Mỗi dòng một câu"></textarea>
+          <label>Lời bài hát <span style="color:var(--err)">*</span> <span style="color:var(--dim)">· bắt buộc khi có phụ đề, để phụ đề đúng lời</span></label>
+          <textarea name="lyrics" placeholder="Dán lời bài hát, mỗi dòng một câu"></textarea>
         </div>
       </div>
 
@@ -704,7 +704,13 @@ async function loadPrefs() {
   for (const n of PREF_KEYS) { const el = $('#f')[n]; if (el) el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', savePrefs); }
 }
 
-function syncGo() { const ok = !!file.files[0]; $('#go').disabled = !ok; $('#goHint').hidden = ok; }
+function syncGo() {
+  const f = $('#f'), needLyrics = f.with_subs.checked && !f.lyrics.value.trim();
+  const why = !file.files[0] ? 'Chọn file nhạc ở bước 1 để bắt đầu' : needLyrics ? 'Dán lời bài hát ở bước 2 (hoặc tắt "Tạo video có phụ đề")' : '';
+  $('#go').disabled = !!why; $('#goHint').hidden = !why; $('#goHint').textContent = why;
+}
+$('#f').lyrics.addEventListener('input', syncGo);
+$('#f').with_subs.addEventListener('change', syncGo);
 // màu tên bài: ô màu + mã hex đồng bộ
 function syncHex() { document.querySelectorAll('.colorf').forEach(b => { b.querySelector('[type=text]').value = b.querySelector('[type=color]').value.toUpperCase(); }); }
 document.addEventListener('input', e => {  // bắt chung: cả ô màu trong bảng Tinh chỉnh (tạo sau khi chọn dự án)
@@ -787,7 +793,7 @@ $('#f').subtitle_mode.addEventListener('change', syncSubs);
 function syncRange(el) { const lb = el.parentElement.querySelector('.rlb'); if (lb) lb.textContent = el.value + (el.dataset.fmt === 'chữ' ? ' chữ' : el.dataset.fmt); }
 document.querySelectorAll('input[data-fmt]').forEach(el => el.addEventListener('input', () => syncRange(el)));
 syncSubs(); syncGo(); renderPreview();
-loadPrefs().then(() => loadLogos());
+loadPrefs().then(() => { syncGo(); loadLogos(); });
 
 // nút Cài đặt: mở/đóng bảng kết nối & phiên bản
 // bảng cài đặt phủ lên danh sách dự án, kéo cao sát dưới thanh logo
@@ -830,6 +836,7 @@ setInterval(() => { $('#setDot').hidden = !(!$('#pixForm').hidden || $('#updBtn'
 $('#f').onsubmit = async e => {
   e.preventDefault();
   if (!file.files[0]) return alert('Chọn file nhạc trước');
+  if (e.target.with_subs.checked && !e.target.lyrics.value.trim()) { e.target.lyrics.focus(); return alert('Dán lời bài hát trước khi tạo video có phụ đề'); }
   const fd = new FormData(e.target);
   fd.set('audio', file.files[0]);
   const subs = e.target.with_subs.checked;
