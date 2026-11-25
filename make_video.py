@@ -42,6 +42,18 @@ def render(props_path: Path, out: Path) -> None:
     raise subprocess.CalledProcessError(r.returncode, cmd)
 
 
+# bố cục: title_y (%), title_size (x cạnh ngắn), title_persist (hiện suốt video), show_title, sub_position (None = theo lựa chọn)
+LAYOUTS = {
+    "classic":       dict(show_title=True,  title_y=42, title_size=0.11,  title_persist=False, sub_position=None),
+    "lyrics_center": dict(show_title=False, title_y=42, title_size=0.11,  title_persist=False, sub_position="center"),
+    "intro_center":  dict(show_title=True,  title_y=42, title_size=0.11,  title_persist=False, sub_position="center"),
+    "title_top":     dict(show_title=True,  title_y=12, title_size=0.075, title_persist=True,  sub_position="bottom"),
+    "top_center":    dict(show_title=True,  title_y=12, title_size=0.075, title_persist=True,  sub_position="center"),
+    "title_bottom":  dict(show_title=True,  title_y=86, title_size=0.06,  title_persist=True,  sub_position="center"),
+    "lyrics_top":    dict(show_title=True,  title_y=82, title_size=0.075, title_persist=True,  sub_position="top"),
+}
+
+
 def main() -> None:
     for stream in (sys.stdout, sys.stderr):  # console Windows mặc định cp1252 -> lỗi khi in tiếng Việt
         if hasattr(stream, "reconfigure"):
@@ -81,6 +93,8 @@ def main() -> None:
     p.add_argument("--sub-stroke-width", type=float, default=6, help="độ dày viền phụ đề")
     p.add_argument("--sub-size", type=float, default=6.5, help="cỡ chữ phụ đề, %% cạnh ngắn khung hình")
     p.add_argument("--sub-position", default="bottom", choices=["bottom", "center", "top"])
+    p.add_argument("--layout", default="classic", choices=list(LAYOUTS),
+                   help="bố cục tên bài / dòng phụ / phụ đề (classic = như cũ)")
     p.add_argument("--sub-upper", action="store_true", help="viết hoa phụ đề")
     p.add_argument("--sub-lookahead", type=int, default=2, help="số chữ hiện trước (kiểu preview)")
     p.add_argument("--sub-in-dur", type=float, default=0.3, help="thời lượng hiệu ứng vào (s)")
@@ -238,15 +252,15 @@ def main() -> None:
             "lookahead": 0 if a.subtitle_mode == "p0" else a.sub_lookahead, "leadIn": 0.6,
             "fontFamily": a.sub_font, "fontSize": round(base * a.sub_size / 100),
             "color": a.sub_color, "highlightColor": a.sub_highlight, "strokeColor": a.sub_stroke, "strokeWidth": a.sub_stroke_width,
-            "position": a.sub_position, "uppercase": a.sub_upper,
+            "position": LAYOUTS[a.layout]["sub_position"] or a.sub_position, "uppercase": a.sub_upper,
             **({"animIn": a.sub_in} if a.sub_in else {}), "animOut": a.sub_out,
             "inDur": a.sub_in_dur, "outDur": a.sub_out_dur,
         },
         "title": {
-            "enabled": bool(a.title), "text": a.title, "subtext": a.subtitle_text,
-            "start": 0.3, "duration": 4.0,
-            "fontFamily": a.title_font, "fontSize": round(base * 0.11),
-            "color": a.title_color, "accentColor": "#ff4fa3", "animation": a.title_animation, "animOut": a.title_out, "y": 42,
+            "enabled": bool(a.title) and LAYOUTS[a.layout]["show_title"], "text": a.title, "subtext": a.subtitle_text,
+            "start": 0.3, "duration": max(4.0, total - 0.3) if LAYOUTS[a.layout]["title_persist"] else 4.0,
+            "fontFamily": a.title_font, "fontSize": round(base * LAYOUTS[a.layout]["title_size"]),
+            "color": a.title_color, "accentColor": "#ff4fa3", "animation": a.title_animation, "animOut": a.title_out, "y": LAYOUTS[a.layout]["title_y"],
         },
     }
     if a.logo and Path(a.logo).is_file():

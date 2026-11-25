@@ -319,7 +319,7 @@ async def create_job(
     title_animation: str = Form("zoom"), title_color: str = Form("#ffffff"), title_font: str = Form(""), sub_font: str = Form(""),
     sub_color: str = Form("#ffffff"), sub_highlight: str = Form("#ffd23f"),
     sub_stroke: str = Form("#000000"), sub_stroke_width: float = Form(6), sub_size: float = Form(6.5),
-    sub_position: str = Form("bottom"), sub_upper: str = Form("0"), sub_lookahead: int = Form(2),
+    sub_position: str = Form("bottom"), layout: str = Form("classic"), sub_upper: str = Form("0"), sub_lookahead: int = Form(2),
     sub_in_dur: float = Form(0.3), sub_out_dur: float = Form(0.15),
     title_out: str = Form("fade"), sub_in: str = Form(""), sub_out: str = Form("fade"), theme: str = Form(""),
     whisper_model: str = Form("small"), no_lyrics: bool = Form(False),
@@ -366,6 +366,7 @@ async def create_job(
              "--sub-lookahead", str(max(1, min(6, sub_lookahead))),
              "--sub-in-dur", str(max(0.1, min(2.0, sub_in_dur))), "--sub-out-dur", str(max(0.1, min(2.0, sub_out_dur)))]
     if sub_position in {"bottom", "center", "top"}: args += ["--sub-position", sub_position]
+    if re.fullmatch(r"[a-z_]{1,20}", layout): args += ["--layout", layout]
     if sub_upper == "1": args += ["--sub-upper"]
     for flag, v in (("--title-out", title_out), ("--sub-in", sub_in), ("--sub-out", sub_out)):
         if re.fullmatch(r"[a-z\-]{1,20}", v): args += [flag, v]

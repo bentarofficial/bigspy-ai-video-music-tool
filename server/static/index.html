@@ -366,6 +366,16 @@ label.switch small{color:var(--mute);font-size:11.5px;line-height:1.45;margin-to
           <div><label>Tên bài hát</label><input name="title" placeholder="Hiện ở đầu video"></div>
           <div><label>Dòng phụ</label><input name="subtext" placeholder="Ca sĩ…"></div>
         </div>
+        <label>Bố cục hiển thị</label>
+        <select name="layout">
+          <option value="classic" selected>Tên bài giữa màn hình (4s đầu) · phụ đề theo “Vị trí phụ đề” – như cũ</option>
+          <option value="lyrics_center">Chỉ phụ đề ở chính giữa – ẩn tên bài &amp; dòng phụ</option>
+          <option value="intro_center">Tên bài mở đầu (4s) · sau đó phụ đề ở chính giữa</option>
+          <option value="title_top">Tên bài + dòng phụ cố định phía trên · phụ đề ở dưới</option>
+          <option value="top_center">Tên bài + dòng phụ cố định phía trên · phụ đề ở giữa</option>
+          <option value="title_bottom">Phụ đề ở giữa · tên bài nhỏ cố định phía dưới</option>
+          <option value="lyrics_top">Phụ đề ở trên · tên bài + dòng phụ cố định phía dưới</option>
+        </select>
         <label class="switch"><span>Tạo video có phụ đề<small>Bỏ tích: video chỉ có cảnh, không tách giọng, không nhận diện hay tìm lời bài hát (nhanh hơn nhiều)</small></span><input type="checkbox" name="with_subs" checked></label>
         <div class="needs-subs">
           <label>Lời bài hát <span style="color:var(--err)">*</span> <span style="color:var(--dim)">· bắt buộc khi có phụ đề, để phụ đề đúng lời</span></label>
@@ -681,7 +691,7 @@ drop.ondrop = e => { e.preventDefault(); file.files = e.dataTransfer.files; file
 // nhớ mọi lựa chọn phong cách / AI & xử lý: lưu vào prefs.json trên máy (giữ qua cả khi tắt app),
 // chỉ đổi khi người dùng tự sửa
 const PREF_KEYS = ['orientation', 'subtitle_mode', 'title_animation', 'title_color', 'scene_length', 'theme',
-  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'sub_stroke', 'sub_stroke_width', 'sub_size', 'sub_position', 'sub_upper', 'sub_lookahead', 'sub_in_dur', 'sub_out_dur', 'lang', 'whisper_model', 'ai_model', 'claude_effort', 'with_subs', 'logo_name', 'logo_position', 'logo_size', 'logo_opacity'];
+  'color_filter', 'filter_intensity', 'title_font', 'title_out', 'sub_in', 'sub_out', 'sub_font', 'sub_color', 'sub_highlight', 'sub_stroke', 'sub_stroke_width', 'sub_size', 'sub_position', 'layout', 'sub_upper', 'sub_lookahead', 'sub_in_dur', 'sub_out_dur', 'lang', 'whisper_model', 'ai_model', 'claude_effort', 'with_subs', 'logo_name', 'logo_position', 'logo_size', 'logo_opacity'];
 function readPrefs() {
   const o = {};
   for (const n of PREF_KEYS) { const el = $('#f')[n]; if (el) o[n] = el.type === 'checkbox' ? el.checked : el.value; }
@@ -735,7 +745,12 @@ function renderPreview() {
   box.innerHTML = `<div class="pv"><div class="pvframe" style="aspect-ratio:${RATIO[f.orientation.value] || '9/16'};${wide ? 'width:min(380px,80%)' : ''}"><div class="pvt"></div>${subs ? '<div class="pvsub"><em>Câu hát</em> mẫu sẽ hiện ở đây</div>' : ''}</div>
   <div class="pvmeta"><span>📐 ${sel('orientation')}</span><span>✨ ${sel('title_animation')}</span>${subs ? `<span>💬 ${sel('subtitle_mode')}</span>` : '<span>🔇 Không phụ đề</span>'}<span>🎨 ${sel('color_filter')}</span></div>
   <div class="muted">Xem trước bố cục · chọn dự án ở thanh bên để xem video</div></div>`;
+  const L = {classic: [42, null, 1], lyrics_center: [null, 'center'], intro_center: [42, 'center', 1], title_top: [12, 'bottom', .7],
+    top_center: [12, 'center', .7], title_bottom: [86, 'center', .55], lyrics_top: [82, 'top', .7]}[f.layout.value] || [42, null, 1];
   const t = box.querySelector('.pvt'); t.style.color = f.title_color.value;
+  if (L[0] == null) t.hidden = true; else { t.style.top = L[0] + '%'; t.style.fontSize = 18 * L[2] + 'px'; }
+  const ps = box.querySelector('.pvsub'), pos = L[1] || f.sub_position.value;
+  if (ps) Object.assign(ps.style, pos === 'center' ? {top: '50%', bottom: 'auto', transform: 'translateY(-50%)'} : pos === 'top' ? {top: '12%', bottom: 'auto'} : {});
   t.textContent = f.title.value || 'Tên bài hát';
   if (f.subtext.value) { const s = document.createElement('span'); s.className = 'pvs'; s.textContent = f.subtext.value; t.append(s); }
   if (logoUrl) {
