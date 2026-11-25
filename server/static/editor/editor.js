@@ -1220,6 +1220,22 @@ function bindProps() {
 /* ---------- xuất video ---------- */
 function modal(html) { $('#mbox').innerHTML = html; $('#modal').hidden = false; }
 function closeModal() { $('#modal').hidden = true; }
+/* Tiến độ xuất từ log Remotion. Server chỉ trả ~6000 ký tự cuối log nên có thể không còn dòng tiêu đề.
+   Chia thanh: chuẩn bị 0–5%, render khung 5–90%, ghép video 90–100%. */
+function exportProgress(log) {
+  const i = log.lastIndexOf('Xuất video từ Editor'), tail = i < 0 ? log : log.slice(i);
+  const last = (re) => [...tail.matchAll(re)].pop();
+  const enc = last(/Encoded (\d+)\/(\d+)/g), ren = last(/Rendered (\d+)\/(\d+)(?:, time remaining: ([^\r\n]+))?/g);
+  const bun = last(/Bundling (\d+)%/g), cp = last(/Copying public dir ([\d.]+ \w+)/g);
+  const eta = (s) => s ? ' · còn ' + s.trim().replace(/(\d+)m/, '$1 phút').replace(/(\d+)s/, '$1 giây') : '';
+  if (ren && +ren[1] < +ren[2]) return {pct: 5 + 85 * ren[1] / ren[2], text: `${Math.round(5 + 85 * ren[1] / ren[2])}% · Đang render khung ${ren[1]}/${ren[2]}${eta(ren[3])}`};
+  if (enc) return {pct: 90 + 10 * enc[1] / enc[2], text: `${Math.round(90 + 10 * enc[1] / enc[2])}% · Đang ghép video…`};
+  if (ren) return {pct: 90, text: 'Đang ghép video…'};
+  if (/Getting composition/.test(tail)) return {pct: 5, text: 'Đang nạp dự án…'};
+  if (cp) return {pct: 4, text: `Đang chép media (${cp[1]})…`};
+  if (bun) return {pct: 3 * bun[1] / 100, text: `Đang đóng gói (${bun[1]}%)…`};
+  return {pct: 1, text: 'Đang chuẩn bị…'};
+}
 async function exportVideo(opts) {
   if (!TL.clips.length) return toast('Timeline đang trống');
   P()?.pause();
@@ -1231,10 +1247,9 @@ async function exportVideo(opts) {
   catch (e) { $('#xmsg').textContent = '⚠ ' + e.message; return; }
   const poll = async () => {
     let j; try { j = await apiCall(`/api/jobs/${JOB}`); } catch { return setTimeout(poll, 2000); }
-    const tail = j.log.slice(j.log.lastIndexOf('Xuất video từ Editor'));
-    const m = [...tail.matchAll(/Rendered (\d+)\/(\d+)/g)].pop() || [...tail.matchAll(/(\d+)\/(\d+)/g)].pop();
-    if (m && $('#xbar')) $('#xbar').style.width = (100 * m[1] / m[2]).toFixed(1) + '%';
-    if (j.status === 'running') { if ($('#xmsg')) $('#xmsg').textContent = m ? `Đang render khung ${m[1]}/${m[2]}…` : 'Đang chuẩn bị…'; return setTimeout(poll, 1500); }
+    const p = exportProgress(j.log);
+    if ($('#xbar')) $('#xbar').style.width = p.pct.toFixed(1) + '%';
+    if (j.status === 'running') { if ($('#xmsg')) $('#xmsg').textContent = p.text; return setTimeout(poll, 1000); }
     if (!$('#xmsg')) { toast(j.status === 'done' ? '✅ Xuất video xong' : '⚠ Xuất video lỗi'); return; }
     if (j.status === 'done' && j.lastExport) {
       $('#modal').hidden = false; $('#xbar').style.width = '100%';

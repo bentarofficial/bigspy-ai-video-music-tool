@@ -153,8 +153,12 @@ def main() -> None:
     elif not a.no_lyrics:
         asr_input = wav
         print(f"③ Nhận diện lời (Whisper {a.whisper_model}, CPU — có thể mất vài phút)")
-        recognized = lyrics.transcribe(asr_input, a.whisper_model, a.lang)
+        hint = lyrics.lyric_hint(Path(a.lyrics).read_text(encoding="utf-8")) if a.lyrics else ""
+        if hint:
+            print("  dùng lời bài hát bạn dán làm gợi ý từ vựng cho Whisper")
+        recognized = lyrics.transcribe(asr_input, a.whisper_model, a.lang, hint)
         clipped = a.start is not None or a.end is not None
+        lyrics.VARIANT_LOG.clear()
         if a.lyrics and not clipped:
             print("  căn lời bài hát của bạn vào giọng hát")
             words = lyrics.align_lyrics(Path(a.lyrics).read_text(encoding="utf-8"), recognized, total)
@@ -177,6 +181,9 @@ def main() -> None:
             if ref:
                 words, n = lyrics.correct_with_reference(recognized, ref["text"])
                 print(f"  ✔ Sửa {n} chữ theo {ref['source']} (giữ nguyên thời gian karaoke)")
+        if lyrics.VARIANT_LOG:
+            print(f"  ✔ Giữ {len(lyrics.VARIANT_LOG)} chữ theo giọng hát thay vì lời dán "
+                  f"(vd. ca sĩ hát 'anh' mà lời ghi 'em'): " + "; ".join(lyrics.VARIANT_LOG[:12]))
         lines = lyrics.to_lines(words)
         (out_dir / "lyrics.json").write_text(json.dumps(lines, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"  {len(lines)} dòng lời")

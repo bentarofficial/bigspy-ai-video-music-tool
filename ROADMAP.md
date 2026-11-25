@@ -21,6 +21,9 @@
 - [x] **Trạng thái AI khi chạy**: hiển thị thời gian chờ và bước đang xử lý.
 - [x] **Hội thoại AI giữ lại**: trước đây mỗi lệnh xong và mỗi lần xuất video đều xoá hội thoại; nay lưu theo dự án (`ai_chat.json`), dùng chung giữa trang chủ và Editor, có nút Xoá hội thoại.
 - [x] **Trang chủ: bỏ bảng Tinh chỉnh**, thay bằng Sửa bằng AI + nút Xuất video (`/api/jobs/{id}/ai-apply`, `ai-undo`, `export-saved`). Tab AI là tab đầu tiên trong Editor.
+- [x] **Lời dán chỉ để tham khảo, đối chiếu với giọng hát**: chữ biến thể (anh/em, chàng/nàng, vợ/chồng, he/she…) giữ theo ca sĩ hát; lời dán còn làm gợi ý từ vựng cho Whisper. Log ghi rõ các chữ đã giữ theo giọng hát.
+- [ ] **Đối chiếu lời: chưa thử trên bài thật** (một bản nam, một bản nữ).
+- [ ] **Ý tưởng tiếp: AI phân xử các câu khác nhau** giữa lời dán và giọng hát (ngoài các cặp anh/em…), hiện để Whisper + lời dán quyết định.
 - [ ] **Xuất video từ trang chủ**: chưa chạy thử trọn một lần render.
 - [ ] **Huỷ lệnh AI đang chạy**: cần cơ chế dừng CLI ở server; chưa triển khai.
 - [ ] **Ý tưởng đã đề xuất, chưa chọn làm**: sóng âm + điểm nhịp trên track Nhạc, "cắt theo nhịp", thư viện clip Pixabay trong tab Media, keyframe, marker, xuất một đoạn in/out, lưu phiên bản dự án.

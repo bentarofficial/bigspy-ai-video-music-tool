@@ -186,6 +186,11 @@ video{width:100%;max-height:62vh;background:#000;display:block}
 .tabs{display:inline-flex;gap:4px;padding:4px;background:var(--field);border:1px solid var(--line);border-radius:12px;margin-bottom:6px}
 .tab{background:transparent;box-shadow:none;color:var(--mute);padding:7px 14px;border-radius:9px}
 .tab.on{background:rgba(255,255,255,.08);color:var(--text)}
+.rprog{display:flex;flex-direction:column;align-items:center;gap:8px;width:min(80%,420px)}
+.rprog b{font-size:22px}
+.rprog .rbar{width:100%;height:6px;border-radius:3px;background:rgba(255,255,255,.12);overflow:hidden}
+.rprog .rbar i{display:block;height:100%;background:var(--accent,#60a5fa);transition:width .8s linear}
+.rprog span{font-size:13px;color:var(--mute)}
 #aiCard .aiex{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px}
 #aiCard .aiex button{font-size:12px;padding:5px 10px}
 #aiCard textarea{width:100%;box-sizing:border-box}
@@ -1134,6 +1139,22 @@ async function select(id) {
   loadJobs(); refresh();
 }
 
+/* Tiến độ render/xuất (Remotion) hiện trong khung video: thanh + %, khung đã render, thời gian còn lại. */
+function renderProgress(log) {
+  const box = $('#vid .vempty'); if (!box) return;
+  // bắt đầu từ mốc gần nhất (xuất từ Editor / các bước ①–⑥ / "✔ Đã tạo" trước render) để không đọc nhầm dòng của lần trước
+  const i = Math.max(...['Xuất video từ Editor', '✔ Đã tạo', '①', '②', '③', '④', '⑤', '⑥'].map(k => log.lastIndexOf(k))), tail = i < 0 ? log : log.slice(i);
+  const last = (re) => [...tail.matchAll(re)].pop();
+  const ren = last(/Rendered (\d+)\/(\d+)(?:, time remaining: ([^\r\n]+))?/g), enc = last(/Encoded (\d+)\/(\d+)/g), bun = last(/Bundling (\d+)%/g);
+  let pct, text;
+  if (ren && +ren[1] < +ren[2]) { pct = 5 + 85 * ren[1] / ren[2]; text = `Đang render khung ${ren[1]}/${ren[2]}` + (ren[3] ? ' · còn ' + ren[3].trim().replace(/(\d+)m/, '$1 phút').replace(/(\d+)s/, '$1 giây') : ''); }
+  else if (enc) { pct = 90 + 10 * enc[1] / enc[2]; text = 'Đang ghép video…'; }
+  else if (ren) { pct = 90; text = 'Đang ghép video…'; }
+  else if (bun) { pct = 3 * bun[1] / 100; text = 'Đang chuẩn bị render…'; }
+  else return;  // các bước trước render (nhận lời, tải clip…): giữ dòng chữ mặc định
+  box.innerHTML = `<div class="rprog"><b>${Math.round(pct)}%</b><div class="rbar"><i style="width:${pct.toFixed(1)}%"></i></div><span></span></div>`;
+  box.querySelector('span').textContent = text;
+}
 let lastVideoState = null;
 async function refresh() {
   clearTimeout(timer);
@@ -1152,6 +1173,7 @@ async function refresh() {
     $('#dl').href = `/api/jobs/${id}/video`; $('#dl').hidden = !j.hasVideo;
   }
   const running = j.status === 'running';
+  if (running) renderProgress(j.log || '');
   $('#aiCard').hidden = !(j.hasProps || j.hasTimeline) || (running && !j.lastExport);
   if (!$('#aiLog .aimsg.wait:last-child')) ['#aiSend', '#aiLyrics', '#aiUndo', '#exportVid'].forEach(s => $(s).disabled = running);
   $('#exportVid').textContent = running ? 'Đang xuất…' : '⬆ Xuất video';

@@ -12,7 +12,15 @@ from pathlib import Path
 Word = dict  # {"text": str, "start": float, "end": float}
 
 
-def transcribe(audio: Path, model_size: str = "small", language: str | None = None) -> list[list[Word]]:
+def lyric_hint(lyric_text: str, limit: int = 600) -> str:
+    """Đầu lời bài hát làm 'gợi ý' cho Whisper: nghe đúng từ vựng, chính tả, dấu thanh của bài hơn."""
+    lines = [l.strip() for l in lyric_text.splitlines() if l.strip() and not l.strip().startswith(("[", "("))]
+    text = " ".join(lines)
+    return text if len(text) <= limit else text[:limit].rsplit(" ", 1)[0]
+
+
+def transcribe(audio: Path, model_size: str = "small", language: str | None = None,
+               hint: str = "") -> list[list[Word]]:
     from faster_whisper import WhisperModel
 
     import soundfile as sf
@@ -25,14 +33,14 @@ def transcribe(audio: Path, model_size: str = "small", language: str | None = No
     if sr != 16000:
         raise ValueError(f"cần audio 16kHz, nhận {sr}Hz")
     model = WhisperModel(model_size, device="cpu", compute_type="int8")
-    lines, lang = _run(model, samples, 0.0, language, True)
+    lines, lang = _run(model, samples, 0.0, language, True, hint)
     print(f"  ngôn ngữ nhận diện: {lang}")
 
     # Whisper hay "đứt mạch" giữa bài (condition_on_previous_text kẹt lại) và bỏ sót cả đoạn lời.
     # Nghe lại riêng từng khoảng trống dài (kể cả đoạn cuối) với ngữ cảnh mới.
     total = len(samples) / sr
     for g0, g1 in _gaps(lines, total, GAP_RETRY):
-        extra, _ = _run(model, samples[int(g0 * sr):int(g1 * sr)], g0, lang, False)
+        extra, _ = _run(model, samples[int(g0 * sr):int(g1 * sr)], g0, lang, False, hint)
         extra = [l for l in extra if l[0]["start"] >= g0 - 0.2 and l[-1]["end"] <= g1 + 0.5]
         if extra:
             print(f"  nghe lại {g0:.1f}s→{g1:.1f}s: thêm {len(extra)} dòng")
@@ -53,12 +61,13 @@ def _gaps(lines: list[list[Word]], total: float, min_gap: float) -> list[tuple[f
     return out
 
 
-def _run(model, samples, offset: float, language, cond: bool):
+def _run(model, samples, offset: float, language, cond: bool, hint: str = ""):
     # KHÔNG dùng VAD: bộ lọc giọng nói coi giọng hát lẫn trong nhạc là tiếng ồn và cắt mất lời.
     segments, info = model.transcribe(
         samples, language=language, word_timestamps=True, vad_filter=False, beam_size=5,
         # Giữ ngữ cảnh câu trước: với nhạc, tắt đi lại khiến Whisper "bịa" câu kiểu "subscribe…"
         condition_on_previous_text=cond,
+        initial_prompt=hint or None,
     )
     lines = []
     for seg in segments:
@@ -105,6 +114,30 @@ def _norm(token: str) -> str:
     return "".join(c for c in token if unicodedata.category(c)[0] in "LN")
 
 
+# Cặp chữ hay khác nhau giữa bản lời và giọng hát thật (ca sĩ nam/nữ, hát lại đổi ngôi).
+# Khi Whisper nghe rõ một chữ trong cặp mà lời dán ghi chữ kia -> giữ chữ ca sĩ hát.
+_VARIANTS = [{"anh", "em"}, {"chang", "nang"}, {"chong", "vo"}, {"ong", "ba"}, {"trai", "gai"},
+             {"co", "cau"}, {"chau", "co"}, {"he", "she"}, {"him", "her"}, {"his", "her"}, {"boy", "girl"},
+             {"man", "woman"}, {"king", "queen"}, {"husband", "wife"}, {"boyfriend", "girlfriend"}]
+VARIANT_LOG: list[str] = []  # các chỗ đã giữ theo giọng hát (để in ra log)
+
+
+def _variant(heard: str, ref: str) -> bool:
+    a, b = _norm(heard), _norm(ref)
+    return a != b and {a, b} in _VARIANTS
+
+
+def _keep_sung(heard: dict, ref_tok: str) -> str:
+    """Chữ hiển thị: giữ chữ ca sĩ hát nếu là biến thể (anh/em…), giữ hoa/thường và dấu câu của lời dán."""
+    if not _variant(heard["text"], ref_tok):
+        return ref_tok
+    core = re.sub(r"[^\w]", "", heard["text"])
+    if ref_tok[:1].isupper():
+        core = core[:1].upper() + core[1:]
+    VARIANT_LOG.append(f"{ref_tok} -> {core} ({heard['start']:.1f}s)")
+    return re.sub(r"\w+", core, ref_tok, count=1)
+
+
 def align_lyrics(lyric_text: str, recognized: list[list[Word]], total: float) -> list[list[Word]]:
     lyric_lines = [l.strip() for l in lyric_text.splitlines() if l.strip() and not l.strip().startswith("[")]
     user = [(li, tok) for li, line in enumerate(lyric_lines) for tok in line.split()]
@@ -118,6 +151,13 @@ def align_lyrics(lyric_text: str, recognized: list[list[Word]], total: float) ->
         if tag == "equal":
             for k in range(i2 - i1):
                 times[i1 + k] = (rec[j1 + k]["start"], rec[j1 + k]["end"])
+        elif tag == "replace" and i2 - i1 == j2 - j1:
+            # cùng số chữ: giữ thời gian từng chữ; chữ biến thể (anh/em…) lấy theo giọng hát
+            for k in range(i2 - i1):
+                w = rec[j1 + k]
+                times[i1 + k] = (w["start"], w["end"])
+                li, tok = user[i1 + k]
+                user[i1 + k] = (li, _keep_sung(w, tok))
         elif tag == "replace":
             # Whisper nghe sai chữ: chia đều khoảng thời gian của đoạn nghe sai cho các chữ đúng
             a, b = rec[j1]["start"], rec[j2 - 1]["end"]
@@ -226,6 +266,9 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
                 for x, t in enumerate(ref[i1:i2]):
                     if n_rec == n_ref:
                         s, e, li = part[x]["start"], part[x]["end"], part[x]["line"]
+                        t = _keep_sung(part[x], t)
+                        if t == part[x]["text"]:
+                            changed -= 1  # giữ nguyên chữ ca sĩ hát -> không tính là sửa
                     else:
                         step = (b - a) / n_ref
                         s, e = a + x * step, a + (x + 1) * step
@@ -249,7 +292,7 @@ def correct_with_reference(recognized: list[list[Word]], ref_text: str,
                 # Mép đầu/cuối clip, cạnh một đoạn khớp: lấy đúng n_rec chữ liền kề trong lời chuẩn, thay 1-1
                 seg = ref[i1:i1 + n_rec] if k > 0 else ref[max(i2 - n_rec, i1):i2]
                 for w, t in zip(part, seg):
-                    out.append(dict(w, text=t))
+                    out.append(dict(w, text=_keep_sung(w, t)))
                 out.extend(part[len(seg):])
                 changed += len(seg)
             elif n_rec >= 4 and depth < 4 and tag in ("replace", "delete"):
