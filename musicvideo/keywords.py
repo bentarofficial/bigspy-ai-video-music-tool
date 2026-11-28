@@ -41,8 +41,8 @@ Scenes (lyrics may be in any language):
 
 For EACH scene write a short English Pixabay video search query (2-3 words) for concrete,
 filmable visuals matching the lyrics' meaning and mood. Keep a consistent visual style across
-the video, vary shots between neighbouring scenes, prefer cinematic scenery/people silhouettes,
-avoid text, logos and abstract words. NEVER use animals (no birds, dogs, cats, fish, insects, wildlife). Instrumental scenes: match the song's mood.
+the video, vary shots between neighbouring scenes, prefer cinematic scenery, landscapes, sky, city, weather and objects,
+avoid text, logos and abstract words. NEVER use animals or people (no birds, dogs, cats, fish, insects, persons, faces, hands, couples, silhouettes, crowds). Instrumental scenes: match the song's mood.
 Reply with ONLY a JSON array of strings, exactly {len(scenes)} items, in order."""
 
     effort = effort or os.environ.get("MV_CLAUDE_EFFORT") or ""

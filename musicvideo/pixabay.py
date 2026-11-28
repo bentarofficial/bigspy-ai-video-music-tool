@@ -18,7 +18,7 @@ from .config import DATA_DIR, OUTPUT_DIR
 API = "https://pixabay.com/api/videos/"
 CACHE_TTL = 24 * 3600
 
-# Video nhạc không dùng cảnh động vật: loại mọi clip có tag liên quan tới động vật.
+# Video nhạc không dùng cảnh động vật hay con người: loại mọi clip có tag liên quan.
 ANIMAL_WORDS = set("""
 animal animals wildlife pet pets dog dogs puppy puppies cat cats kitten kittens bird birds
 seagull seagulls gull pigeon pigeons dove doves duck ducks swan swans goose geese chicken chickens
@@ -29,6 +29,11 @@ elephant elephants giraffe zebra monkey monkeys ape gorilla fox wolf wolves rabb
 mouse mice rat hamster insect insects bee bees butterfly butterflies moth ant ants spider
 dragonfly ladybug beetle snake snakes lizard frog frogs crab crabs coral koi zoo fauna mammal
 reptile safari camel donkey kangaroo koala panda raccoon hedgehog bat bats snail worm
+"
+person people man men woman women girl girls boy boys child children kid kids baby babies
+human humans couple couples family friends crowd lady guy teen teenager adult face faces portrait
+selfie model models hand hands feet foot leg legs silhouette silhouettes dancer dancers dancing
+singer musician guitarist bride groom businessman worker student students tourist tourists
 """.split())
 
 

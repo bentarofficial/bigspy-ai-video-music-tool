@@ -400,7 +400,7 @@ async def create_job(
         (d / "lyrics_input.txt").write_text(lyrics, encoding="utf-8")
         args += ["--lyrics", str(d / "lyrics_input.txt")]
 
-    write_meta(d, {"id": job_id, "title": title or audio.filename, "created": time.time(), "status": "running",
+    write_meta(d, {"id": job_id, "title": out_name.strip()[:120] or title or audio.filename, "songTitle": title, "created": time.time(), "status": "running",
                    "exportName": _safe_name(out_name or Path(audio.filename or job_id).stem), "args": args})
     spawn(job_id, d, args)
     return {"id": job_id}
@@ -945,7 +945,7 @@ def fix_lyrics_ops(job_id: str, tl: dict, ref_text: str = "") -> dict:
             ref_text, src = f.read_text(encoding="utf-8"), "lời đã dán khi tạo video"
         else:
             meta = read_meta(d)
-            ref = lyrics_lookup.find_reference(heard, meta.get("title", ""), meta.get("subtext", ""))
+            ref = lyrics_lookup.find_reference(heard, meta.get("songTitle") or meta.get("title", ""), meta.get("subtext", ""))
             if not ref:
                 return {"reply": "Đã research nhưng không tìm được lời chuẩn khớp với bài này — "
                                  "hãy dán lời đúng vào ô AI (vd: \"sửa phụ đề theo lời: ...\").", "ops": []}
@@ -1354,7 +1354,7 @@ def tiktok_get_settings():
 
 
 def _caption(meta: dict) -> str:
-    title = re.sub(r"\.(wav|mp3|m4a|flac|ogg|aac)$", "", meta.get("title") or "", flags=re.I).strip()
+    title = re.sub(r"\.(wav|mp3|m4a|flac|ogg|aac)$", "", meta.get("songTitle") or meta.get("title") or "", flags=re.I).strip()
     return f"{title} {_merge_tags(os.environ.get('TIKTOK_HASHTAGS', DEFAULT_TAGS))}".strip()
 
 
@@ -1432,7 +1432,7 @@ def ai_caption(job_id: str, body: dict | None = None):
     meta = read_meta(d)
     if not llm.available():
         raise HTTPException(400, "Chưa kết nối Claude CLI hay Codex CLI (Cài đặt → Kết nối) nên AI chưa viết được caption.")
-    title = re.sub(r"\.(wav|mp3|m4a|flac|ogg|aac)$", "", meta.get("title") or "", flags=re.I).strip()
+    title = re.sub(r"\.(wav|mp3|m4a|flac|ogg|aac)$", "", meta.get("songTitle") or meta.get("title") or "", flags=re.I).strip()
     title = re.sub(r"\s*\(\d+s\)$", "", title)
     variant = "Viết một phiên bản KHÁC hẳn (góc nhìn, cảm xúc khác)." if (body or {}).get("again") else ""
     prompt = CAPTION_PROMPT.format(title=title or "(không rõ)", lyrics=_lyrics_text(d)[:1500] or "(không có lời)",
