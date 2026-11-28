@@ -18,6 +18,24 @@ from .config import DATA_DIR, OUTPUT_DIR
 API = "https://pixabay.com/api/videos/"
 CACHE_TTL = 24 * 3600
 
+# Video nhạc không dùng cảnh động vật: loại mọi clip có tag liên quan tới động vật.
+ANIMAL_WORDS = set("""
+animal animals wildlife pet pets dog dogs puppy puppies cat cats kitten kittens bird birds
+seagull seagulls gull pigeon pigeons dove doves duck ducks swan swans goose geese chicken chickens
+hen rooster eagle hawk owl owls parrot crow flamingo penguin penguins fish fishes shark sharks
+whale whales dolphin dolphins jellyfish turtle turtles horse horses pony cow cows cattle bull
+sheep lamb goat goats pig pigs deer elk moose bear bears lion lions tiger tigers leopard cheetah
+elephant elephants giraffe zebra monkey monkeys ape gorilla fox wolf wolves rabbit bunny squirrel
+mouse mice rat hamster insect insects bee bees butterfly butterflies moth ant ants spider
+dragonfly ladybug beetle snake snakes lizard frog frogs crab crabs coral koi zoo fauna mammal
+reptile safari camel donkey kangaroo koala panda raccoon hedgehog bat bats snail worm
+""".split())
+
+
+def has_animal(hit: dict) -> bool:
+    words = re.findall(r"[a-z]+", str(hit.get("tags", "")).lower())
+    return any(w in ANIMAL_WORDS for w in words)
+
 
 class Pixabay:
     def __init__(self, api_key: str, cache_dir: Path, clips_dir: Path, project_id: str = ""):
@@ -30,6 +48,9 @@ class Pixabay:
         self.clips_dir.mkdir(parents=True, exist_ok=True)
 
     def search(self, query: str, per_page: int = 50, page: int = 1) -> list[dict]:
+        return [h for h in self._search(query, per_page, page) if not has_animal(h)]
+
+    def _search(self, query: str, per_page: int = 50, page: int = 1) -> list[dict]:
         query = query[:100]
         f = self.cache_dir / (hashlib.md5(query.lower().encode()).hexdigest() + (f"-{page}" if page > 1 else "") + ".json")
         if f.exists() and time.time() - f.stat().st_mtime < CACHE_TTL:
