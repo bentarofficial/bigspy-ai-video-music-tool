@@ -314,7 +314,7 @@ async def cut_audio(audio: UploadFile = File(...), start: float = Form(0.0), end
 @app.post("/api/jobs")
 async def create_job(
     audio: UploadFile = File(...),
-    title: str = Form(""), subtext: str = Form(""), lyrics: str = Form(""),
+    title: str = Form(""), subtext: str = Form(""), lyrics: str = Form(""), out_name: str = Form(""),
     lang: str = Form(""), orientation: str = Form("portrait"), subtitle_mode: str = Form("karaoke"),
     title_animation: str = Form("zoom"), title_color: str = Form("#ffffff"), title_font: str = Form(""), sub_font: str = Form(""),
     sub_color: str = Form("#ffffff"), sub_highlight: str = Form("#ffd23f"),
@@ -401,7 +401,7 @@ async def create_job(
         args += ["--lyrics", str(d / "lyrics_input.txt")]
 
     write_meta(d, {"id": job_id, "title": title or audio.filename, "created": time.time(), "status": "running",
-                   "args": args})
+                   "exportName": _safe_name(out_name or Path(audio.filename or job_id).stem), "args": args})
     spawn(job_id, d, args)
     return {"id": job_id}
 
@@ -440,7 +440,8 @@ def get_video(job_id: str):
     f = job_dir(job_id) / "video.mp4"
     if not f.exists():
         raise HTTPException(404, "chưa có video")
-    return FileResponse(f, media_type="video/mp4", filename=f"{job_id}.mp4")
+    name = read_meta(job_dir(job_id)).get("exportName") or job_id
+    return FileResponse(f, media_type="video/mp4", filename=f"{name}.mp4")
 
 
 @app.get("/api/jobs/{job_id}/props")
@@ -1259,7 +1260,7 @@ def export_timeline(job_id: str, body: dict):
         flags.append(f"--audio-bitrate={int(o['abr'])}k")
 
     EXPORTS.mkdir(exist_ok=True)
-    base = _safe_name(o.get("name") or read_meta(d).get("title") or job_id)
+    base = _safe_name(o.get("name") or read_meta(d).get("exportName") or read_meta(d).get("title") or job_id)
     out, n = EXPORTS / f"{base}{ext}", 2
     while out.exists():
         out, n = EXPORTS / f"{base} ({n}){ext}", n + 1
@@ -1276,7 +1277,7 @@ def export_timeline(job_id: str, body: dict):
     procs[job_id] = subprocess.Popen(cmd, cwd=REMOTION_DIR, shell=True, stdout=log, stderr=subprocess.STDOUT,
                                      creationflags=NO_WINDOW)
     meta = read_meta(d)
-    meta.update(status="running", lastExport=out.name)
+    meta.update(status="running", lastExport=out.name, exportName=base)
     write_meta(d, meta)
     return {"ok": True, "file": out.name}
 

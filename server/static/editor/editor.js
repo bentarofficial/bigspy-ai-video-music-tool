@@ -1593,7 +1593,7 @@ function exportDialog() {
   const short = Math.min(TL.width, TL.height);
   modal(`<h3>⬆ Xuất video</h3>
     <div class="ratios" id="xpre">${[['tiktok', '📱 TikTok', '1080p · 30fps'], ['youtube', '▶ YouTube', '1080p · cao'], ['reels', '📘 Reels', '1080p · vừa'], ['zalo', '💬 Gửi Zalo', '720p · nhẹ']].map(([k, a, b]) => `<button type="button" data-p="${k}">${a}<small>${b}</small></button>`).join('')}</div>
-    <label class="full">Tên file <input id="xname" maxlength="80" value="${esc($('#ptitle').value)}"></label>
+    <label class="full">Tên file <input id="xname" maxlength="80" value="${esc(META.exportName || $('#ptitle').value)}" placeholder="Tên file video khi xuất"></label>
     <div class="xgrid">
       <label>Độ phân giải ${sel_('xh', [[0, `Giữ nguyên (${short}p)`], [480, '480p'], [720, '720p'], [1080, '1080p'], [1440, '2K'], [2160, '4K']], o.height)}</label>
       <label>Chất lượng ${sel_('xq', [['low', 'Thấp'], ['medium', 'Vừa'], ['high', 'Cao'], ['best', 'Rất cao']], o.quality)}</label>
@@ -1617,7 +1617,7 @@ function exportDialog() {
     $('#xh').value = p.height; $('#xq').value = p.quality; $('#xf').value = p.fps; $('#xfmt').value = p.format; $('#xs').value = p.speed; $('#xa').value = p.abr; est();
   };
   $('#xcancel').onclick = closeModal;
-  $('#xgo').onclick = () => { const v = read(); try { localStorage.setItem('ed.export', JSON.stringify({...v, name: undefined})); } catch {} exportVideo(v); };
+  $('#xgo').onclick = () => { const v = read(); try { localStorage.setItem('ed.export', JSON.stringify({...v, name: undefined})); } catch {} META.exportName = v.name || META.exportName; exportVideo(v); };
 }
 
 function bindPhase2() {
